@@ -1,0 +1,91 @@
+on:
+  # 🎯 只保留 Pull Request 事件：预览 + merge执行
+  pull_request:
+    branches:
+      - main
+      - alpha
+      - beta
+    types: [opened, synchronize, reopened, labeled, unlabeled, closed]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Upload publish artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: publish-artifact
+          path: dist
+
+  version-path:
+    name: version-management-${{ github.event.pull_request.base.ref }}
+    runs-on: ubuntu-latest
+    # 🎯 简化条件：预览模式（有标签） + 执行模式（PR合并）
+    if: |
+      !contains(github.event.head_commit.message, '[skip ci]') && 
+      github.event_name == 'pull_request' && (
+        (github.event.action != 'closed' && github.event.pull_request.labels.*) ||
+        (github.event.action == 'closed' && github.event.pull_request.merged == true)
+      )
+    needs: build
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Download publish artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: publish-artifact
+          path: dist
+
+      - name: Version patch
+        id: version-patch
+        uses: ./
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
+          # 版本管理配置
+          version-prefix: 'v'  # 版本标签前缀，如 v1.0.0
+          git-user-name: 'GitHub Action'  # Git 提交时的用户名
+          git-user-email: 'action@github.com'  # Git 提交时的邮箱
+          supported-branches: 'main,beta,alpha'  # 支持版本管理的分支列表
+          enable-changelog: 'true'  # 自动生成和更新 CHANGELOG.md
+          comment-title: '📦 版本管理'  # PR 评论中显示的标题
+          
+          # NPM 发布配置 - Action 仓库本身不发布 npm 包
+          enable-npm-publish: 'false'  # Action 仓库本身禁用 npm 发布
