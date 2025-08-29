@@ -1,7 +1,7 @@
 import { context } from '@actions/github';
 import core, { logger } from './core';
 import { configureGitUser, syncBranches, updateVersionAndCreateTag } from './git';
-import { createErrorComment, handlePreviewMode, PRUtils } from './pr';
+import { createErrorComment, getCurrentPRNumber, handlePreviewMode } from './pr';
 import { ActionError, isSupportedBranch, type PRData, type SupportedBranch } from './types';
 import { calculateNewVersion, getBaseVersion } from './version';
 
@@ -144,7 +144,7 @@ async function run(): Promise<void> {
     try {
       const prPayload = context.payload.pull_request;
       if (prPayload) {
-        const prNumber = PRUtils.getCurrentPRNumber(prPayload as PRData);
+        const prNumber = getCurrentPRNumber(prPayload as PRData);
         if (prNumber) {
           await createErrorComment(prNumber, errorMessage);
           logger.info(`已在 PR #${prNumber} 创建错误评论`);

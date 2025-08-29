@@ -1,17 +1,10 @@
 import { exec } from '@actions/exec';
 import { context, getOctokit } from '@actions/github';
 import { readPackageJSON, resolvePackageJSON, writePackageJSON } from 'pkg-types';
+import { COMMIT_TEMPLATES, ERROR_MESSAGES, GIT_USER_CONFIG } from './constants';
 import core, { logger } from './core';
-import {
-  ActionError,
-  type BranchSyncResult,
-  COMMIT_TEMPLATES,
-  ERROR_MESSAGES,
-  GIT_USER_CONFIG,
-  type PRData,
-  type SupportedBranch,
-} from './types';
-import { VersionUtils } from './version';
+import { ActionError, type BranchSyncResult, type PRData, type SupportedBranch } from './types';
+import { addVersionPrefix, cleanVersion, parseVersion } from './version';
 
 // ==================== Git 基础操作 ====================
 
@@ -114,8 +107,8 @@ export async function commitAndPushFile(
  */
 export async function commitAndPushVersion(version: string, targetBranch: SupportedBranch): Promise<void> {
   try {
-    const packageVersion = VersionUtils.cleanVersion(version);
-    const fullVersion = VersionUtils.addVersionPrefix(version);
+    const packageVersion = cleanVersion(version);
+    const fullVersion = addVersionPrefix(version);
 
     // 提交版本更改
     await execGit(['add', '.']);
@@ -192,7 +185,8 @@ async function generateChangelogFromPR(pr: PRData | null, version: string): Prom
   // 从PR标签推断变更类型
   let changeType = '📝 Changes';
   if (pr.labels) {
-    for (const label of pr.labels) {
+    for (let i = 0; i < pr.labels.length; i++) {
+      const label = pr.labels[i];
       if (labelToChangelogType[label.name]) {
         changeType = labelToChangelogType[label.name];
         break;
@@ -229,7 +223,8 @@ async function generateChangelogFromPR(pr: PRData | null, version: string): Prom
       '### Summary',
       '## Summary',
     ];
-    for (const section of sections) {
+    for (let i = 0; i < sections.length; i++) {
+      const section = sections[i];
       const sectionIndex = body.indexOf(section);
       if (sectionIndex !== -1) {
         const sectionContent = body.substring(sectionIndex + section.length);
@@ -733,8 +728,8 @@ function determineNpmTag(version: string, targetBranch: SupportedBranch, configT
   }
 
   // 如果是预发布版本，根据prerelease标识确定标签
-  const cleanVersion = VersionUtils.cleanVersion(version);
-  const parsed = VersionUtils.parseVersion(cleanVersion);
+  const cleanedVersion = cleanVersion(version);
+  const parsed = parseVersion(cleanedVersion);
   if (parsed?.prerelease && parsed.prerelease.length > 0) {
     const prereleaseId = parsed.prerelease[0] as string;
     if (prereleaseId === 'alpha') return 'alpha';
@@ -861,7 +856,7 @@ export async function updateVersionAndCreateTag(
     // 检查是否有 CHANGELOG 更改需要提交
     const hasChanges = await hasFileChanges('CHANGELOG.md');
     if (hasChanges) {
-      const fullVersion = VersionUtils.addVersionPrefix(newVersion);
+      const fullVersion = addVersionPrefix(newVersion);
       await commitAndPushFile('CHANGELOG.md', COMMIT_TEMPLATES.CHANGELOG_UPDATE(fullVersion), targetBranch);
       logger.info('✅ CHANGELOG 更新已提交');
     } else {
