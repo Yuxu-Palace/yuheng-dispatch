@@ -1,5 +1,4 @@
 import { context, getOctokit } from '@actions/github';
-import type { ReleaseType } from 'semver';
 import { COMMENT_CONFIG, COMMENT_TEMPLATES } from './constants';
 import core, { logger } from './core';
 import { ActionError, type PRData, type VersionPreviewData } from './types';
@@ -16,29 +15,6 @@ const octokit = getOctokit(core.getInput('token', { required: true }));
  */
 export function getCurrentPRNumber(pr: PRData | null): number | null {
   return context.payload.pull_request?.number || pr?.number || null;
-}
-
-/**
- * 从 PR 标签获取发布类型
- */
-export function getReleaseTypeFromLabels(labels: { name: string }[] = []): ReleaseType | '' {
-  const labelNames = labels.map((label) => label.name);
-
-  // 按优先级顺序检查标签（major > minor > patch）
-  let tempReleaseType = '' as ReleaseType;
-
-  if (labelNames.includes('major')) {
-    tempReleaseType = 'premajor';
-    logger.info('检测到 major 标签，使用 premajor 发布类型');
-  } else if (labelNames.includes('minor')) {
-    tempReleaseType = 'preminor';
-    logger.info('检测到 minor 标签，使用 preminor 发布类型');
-  } else if (labelNames.includes('patch')) {
-    tempReleaseType = 'prepatch';
-    logger.info('检测到 patch 标签，使用 prepatch 发布类型');
-  }
-
-  return tempReleaseType;
 }
 
 // ==================== PR 信息获取 ====================

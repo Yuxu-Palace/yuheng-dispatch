@@ -1,8 +1,8 @@
-import { exec } from '@actions/exec';
 import { readPackageJSON, resolvePackageJSON, writePackageJSON } from 'pkg-types';
 import semver, { type ReleaseType } from 'semver';
 import { DEFAULT_VERSIONS, VERSION_PREFIX_CONFIG } from './constants';
 import { logger } from './core';
+import { execGitWithOutput } from './git';
 import { createErrorComment, getCurrentPRNumber } from './pr';
 import { ActionError, type PRData, type SupportedBranch, type VersionSummary } from './types';
 
@@ -41,6 +41,26 @@ async function throwErrorWithComment(
  */
 export function getVersionPrefix(): string {
   return VERSION_PREFIX_CONFIG.custom;
+}
+
+/**
+ * 从PR标签获取发布类型
+ */
+export function getReleaseTypeFromLabels(labels: { name: string }[] = []): ReleaseType | null {
+  const labelNames = labels.map((label) => label.name);
+
+  if (labelNames.includes('major')) {
+    logger.info('检测到 major 标签，使用 premajor 发布类型');
+    return 'premajor';
+  } else if (labelNames.includes('minor')) {
+    logger.info('检测到 minor 标签，使用 preminor 发布类型');
+    return 'preminor';
+  } else if (labelNames.includes('patch')) {
+    logger.info('检测到 patch 标签，使用 prepatch 发布类型');
+    return 'prepatch';
+  }
+
+  return null;
 }
 
 /**
@@ -354,41 +374,6 @@ async function validateBranchVersionState(targetBranch: SupportedBranch, pr: PRD
   logger.info(`✅ ${targetBranch} 分支允许在当前版本状态 (${latestTagType}) 下进行开发`);
 }
 
-// ==================== Git 版本操作 ====================
-
-/**
- * 执行 git 命令并捕获输出
- */
-async function execGitWithOutput(args: string[]): Promise<string> {
-  let stdout = '';
-  await exec('git', args, {
-    listeners: {
-      stdout: (data: Buffer) => {
-        stdout += data.toString();
-      },
-    },
-  });
-  return stdout.trim();
-}
-
-/**
- * 获取版本信息
- */
-// export async function getVersionInfo(targetBranch: SupportedBranch): Promise<VersionInfo> {
-//   const currentTagVersion = await versionManager.getLatestVersion(targetBranch === 'main' ? 'main' : targetBranch);
-//   const betaTagVersion = await versionManager.getLatestVersion('beta');
-
-//   const current = currentTagVersion || DEFAULT_VERSIONS.base;
-//   const beta = betaTagVersion || DEFAULT_VERSIONS.beta;
-
-//   return {
-//     current,
-//     beta,
-//     currentTag: currentTagVersion,
-//     betaTag: betaTagVersion,
-//   };
-// }
-
 // ==================== 版本升级规则定义 ====================
 
 /**
@@ -455,35 +440,15 @@ class AlphaStrategy implements VersionUpgradeStrategy {
     }
 
     // 从PR标签获取发布类型
-    const releaseType = this.getReleaseTypeFromLabels(pr.labels);
+    const releaseType = getReleaseTypeFromLabels(pr.labels);
     if (!releaseType) {
       const labelNames = pr.labels.map((l) => l.name).join(', ');
       logger.info(`📝 PR #${pr.number} 有标签但无版本标签: [${labelNames}]，跳过版本升级`);
       return null;
     }
 
-    // 🚫 业务规则检查：基于最新tag状态验证是否允许Alpha开发
-    await validateBranchVersionState('alpha', pr);
-
     logger.info(`✅ 使用PR标签: ${releaseType} (来源: PR #${pr.number})`);
     return await this.calculateAlphaVersion(context, releaseType);
-  }
-
-  private getReleaseTypeFromLabels(labels: { name: string }[]): ReleaseType | null {
-    const labelNames = labels.map((label) => label.name);
-
-    if (labelNames.includes('major')) {
-      logger.info('检测到 major 标签，使用 premajor 发布类型');
-      return 'premajor';
-    } else if (labelNames.includes('minor')) {
-      logger.info('检测到 minor 标签，使用 preminor 发布类型');
-      return 'preminor';
-    } else if (labelNames.includes('patch')) {
-      logger.info('检测到 patch 标签，使用 prepatch 发布类型');
-      return 'prepatch';
-    }
-
-    return null;
   }
 
   private async calculateAlphaVersion(context: VersionUpgradeContext, releaseType: ReleaseType): Promise<string> {
@@ -558,10 +523,7 @@ class BetaStrategy implements VersionUpgradeStrategy {
   }
 
   async execute(context: VersionUpgradeContext): Promise<string | null> {
-    const { sourceBranch, baseVersion, pr } = context;
-
-    // 🚫 业务规则检查：基于最新tag状态验证Beta分支操作
-    await validateBranchVersionState('beta', pr);
+    const { sourceBranch, baseVersion } = context;
 
     if (sourceBranch === 'alpha') {
       // 源分支是Alpha：取Alpha的基础号并重置测试号
@@ -589,10 +551,7 @@ class MainStrategy implements VersionUpgradeStrategy {
   }
 
   async execute(context: VersionUpgradeContext): Promise<string | null> {
-    const { baseVersion, pr } = context;
-
-    // 🚫 业务规则检查：基于最新tag状态验证Main分支发布
-    await validateBranchVersionState('main', pr);
+    const { baseVersion } = context;
 
     // 从Beta转换到Main：取Beta的基础号作为正式版本号
     const betaBaseVersion = getBaseVersionString(baseVersion);
@@ -618,6 +577,10 @@ class VersionUpgradeManager {
       const strategy = this.strategies[i];
       if (strategy.canHandle(context)) {
         logger.info(`📋 使用策略: ${strategy.description}`);
+        
+        // 统一执行分支状态验证
+        await validateBranchVersionState(context.targetBranch, context.pr);
+        
         const result = strategy.execute(context);
         return await Promise.resolve(result);
       }
