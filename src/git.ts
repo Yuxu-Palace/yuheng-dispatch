@@ -1,53 +1,14 @@
-import { exec } from '@actions/exec';
+import process from 'node:process';
 import { context, getOctokit } from '@actions/github';
-import * as fs from 'node:fs';
 import { readPackageJSON, resolvePackageJSON, writePackageJSON } from 'pkg-types';
+import { commitChangelog, hasChangelogChanges, updateChangelog } from './changelog';
 import { COMMIT_TEMPLATES, ERROR_MESSAGES, GIT_USER_CONFIG } from './constants';
-import core, { logger } from './core';
+import { logger } from './core';
 import { ActionError, type BranchSyncResult, type PRData, type SupportedBranch } from './types';
-import { addVersionPrefix, cleanVersion, parseVersion } from './version';
+import { addVersionPrefix, cleanVersion, execGit } from './utils';
+import { updatePackageVersion } from './version';
 
 // ==================== Git 基础操作 ====================
-
-/**
- * 统一的错误处理函数
- */
-function handleGitError(error: unknown, context: string, shouldThrow = false): void {
-  const message = `${context}: ${error}`;
-  logger.error(message);
-  if (shouldThrow) throw new ActionError(message, context, error);
-}
-
-/**
- * 执行 git 命令并捕获输出
- */
-export async function execGitWithOutput(args: string[]): Promise<string> {
-  let stdout = '';
-  try {
-    await exec('git', args, {
-      listeners: {
-        stdout: (data: Buffer) => {
-          stdout += data.toString();
-        },
-      },
-    });
-    return stdout.trim();
-  } catch (error) {
-    handleGitError(error, `执行 git ${args.join(' ')}`, true);
-    return '';
-  }
-}
-
-/**
- * 执行 git 命令（无输出捕获）
- */
-export async function execGit(args: string[]): Promise<void> {
-  try {
-    await exec('git', args);
-  } catch (error) {
-    handleGitError(error, `执行 git ${args.join(' ')}`, true);
-  }
-}
 
 /**
  * 配置 Git 用户信息
@@ -56,53 +17,6 @@ export async function configureGitUser(): Promise<void> {
   logger.info('配置 Git 用户信息');
   await execGit(['config', '--global', 'user.name', GIT_USER_CONFIG.name]);
   await execGit(['config', '--global', 'user.email', GIT_USER_CONFIG.email]);
-}
-
-/**
- * 检查文件是否有变化
- */
-export async function hasFileChanges(filepath: string): Promise<boolean> {
-  try {
-    // 检查文件是否存在 - 使用 Node.js fs 模块更可靠
-    if (!fs.existsSync(filepath)) {
-      return false;
-    }
-
-    // 检查是否有变化
-    const statusOutput = await execGitWithOutput(['status', '--porcelain', filepath]);
-    if (statusOutput.length > 0) {
-      logger.info(`检测到 ${filepath} 变化: ${statusOutput}`);
-      return true;
-    }
-
-    // 检查已跟踪文件的变化
-    try {
-      await exec('git', ['diff', '--exit-code', filepath]);
-      return false;
-    } catch {
-      return true;
-    }
-  } catch {
-    return false;
-  }
-}
-
-/**
- * 提交并推送文件更改
- */
-export async function commitAndPushFile(
-  filepath: string,
-  commitMessage: string,
-  targetBranch: SupportedBranch,
-): Promise<void> {
-  try {
-    await execGit(['add', filepath]);
-    await execGit(['commit', '-m', commitMessage]);
-    await execGit(['push', 'origin', targetBranch]);
-    logger.info(`${filepath} 更新已提交并推送`);
-  } catch (error) {
-    handleGitError(error, `提交和推送 ${filepath}`, true);
-  }
 }
 
 /**
@@ -124,7 +38,9 @@ export async function commitAndPushVersion(version: string, targetBranch: Suppor
     // 推送更改和标签（添加冲突处理）
     await safePushWithRetry(targetBranch, fullVersion);
   } catch (error) {
-    handleGitError(error, '提交和推送版本更改', true);
+    const message = `提交和推送版本更改: ${error}`;
+    logger.error(message);
+    throw new ActionError(message, '提交和推送版本更改', error);
   }
 }
 
@@ -163,7 +79,6 @@ async function safePushWithRetry(targetBranch: SupportedBranch, version: string,
   }
 }
 
-
 // ==================== 分支同步逻辑 ====================
 
 /**
@@ -189,7 +104,8 @@ function isAutoSyncCommit(): boolean {
 function getCommitMessage(sourceBranch: SupportedBranch, targetBranch: SupportedBranch, version: string): string {
   if (sourceBranch === 'main' && targetBranch === 'beta') {
     return COMMIT_TEMPLATES.SYNC_MAIN_TO_BETA(version);
-  } else if (sourceBranch === 'beta' && targetBranch === 'alpha') {
+  }
+  if (sourceBranch === 'beta' && targetBranch === 'alpha') {
     return COMMIT_TEMPLATES.SYNC_BETA_TO_ALPHA(version);
   }
   return `chore: sync ${sourceBranch} v${version} to ${targetBranch} [skip ci]`;
@@ -392,7 +308,7 @@ async function syncDownstreamWithRebase(
       // 改用merge策略作为fallback
       const commitMessage = getCommitMessage(sourceBranch, targetBranch, sourceVersion);
       await execGit(['merge', sourceBranch, '--no-edit', '--no-ff', '-m', commitMessage]);
-      logger.info(`rebase失败，改用merge策略完成同步`);
+      logger.info('rebase失败，改用merge策略完成同步');
     }
 
     // 推送更改
@@ -450,7 +366,6 @@ export async function syncBranches(targetBranch: SupportedBranch, newVersion: st
   return results;
 }
 
-
 // ==================== 版本更新和标签创建 ====================
 
 /**
@@ -467,14 +382,12 @@ export async function updateVersionAndCreateTag(
     await execGit(['switch', targetBranch]);
 
     // 更新版本文件
-    const { updatePackageVersion } = await import('./version');
     await updatePackageVersion(newVersion);
 
     // 提交版本更改并推送
     await commitAndPushVersion(newVersion, targetBranch);
 
     // 🎯 在打tag后更新 CHANGELOG - 使用PR信息
-    const { updateChangelog, hasChangelogChanges, commitChangelog } = await import('./changelog');
     await updateChangelog(pr, newVersion);
 
     // 检查是否有 CHANGELOG 更改需要提交

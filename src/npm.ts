@@ -1,7 +1,8 @@
 import { exec } from '@actions/exec';
-import core, { logger } from './core';
+import { getInput, logger, setOutput } from './core';
 import { ActionError, type SupportedBranch } from './types';
-import { cleanVersion, parseVersion } from './version';
+import { cleanVersion } from './utils';
+import { parseVersion } from './version';
 
 // ==================== NPM 发布功能 ====================
 
@@ -9,7 +10,7 @@ import { cleanVersion, parseVersion } from './version';
  * 检查是否启用npm发布
  */
 function isNpmPublishEnabled(): boolean {
-  const enablePublish = core.getInput('enable-npm-publish')?.toLowerCase();
+  const enablePublish = getInput('enable-npm-publish')?.toLowerCase();
   return enablePublish === 'true';
 }
 
@@ -17,10 +18,10 @@ function isNpmPublishEnabled(): boolean {
  * 获取npm发布配置
  */
 function getNpmPublishConfig() {
-  const registry = core.getInput('npm-registry') || 'https://registry.npmjs.org/';
-  const token = core.getInput('npm-token');
-  const tag = core.getInput('npm-tag') || 'latest';
-  const access = core.getInput('npm-access') || 'public';
+  const registry = getInput('npm-registry') || 'https://registry.npmjs.org/';
+  const token = getInput('npm-token');
+  const tag = getInput('npm-tag') || 'latest';
+  const access = getInput('npm-access') || 'public';
 
   return { registry, token, tag, access };
 }
@@ -59,10 +60,12 @@ function determineNpmTag(version: string, targetBranch: SupportedBranch, configT
   if (targetBranch === 'main') {
     // 主分支使用latest标签
     return 'latest';
-  } else if (targetBranch === 'beta') {
+  }
+  if (targetBranch === 'beta') {
     // Beta分支使用beta标签
     return 'beta';
-  } else if (targetBranch === 'alpha') {
+  }
+  if (targetBranch === 'alpha') {
     // Alpha分支使用alpha标签
     return 'alpha';
   }
@@ -72,8 +75,12 @@ function determineNpmTag(version: string, targetBranch: SupportedBranch, configT
   const parsed = parseVersion(cleanedVersion);
   if (parsed?.prerelease && parsed.prerelease.length > 0) {
     const prereleaseId = parsed.prerelease[0] as string;
-    if (prereleaseId === 'alpha') return 'alpha';
-    if (prereleaseId === 'beta') return 'beta';
+    if (prereleaseId === 'alpha') {
+      return 'alpha';
+    }
+    if (prereleaseId === 'beta') {
+      return 'beta';
+    }
   }
 
   return 'latest';
@@ -113,9 +120,9 @@ async function publishToNpm(
     logger.info(`✅ 成功发布到npm: ${version} (标签: ${publishTag})`);
 
     // 设置输出
-    core.setOutput('published-version', version);
-    core.setOutput('published-tag', publishTag);
-    core.setOutput('npm-registry', config.registry);
+    setOutput('published-version', version);
+    setOutput('published-tag', publishTag);
+    setOutput('npm-registry', config.registry);
   } catch (error) {
     // 检查是否是版本已存在的错误
     const errorMessage = String(error);
@@ -157,11 +164,11 @@ export async function handleNpmPublish(version: string, targetBranch: SupportedB
   } catch (error) {
     // npm发布失败不应该中断整个流程
     logger.error(`npm发布失败: ${error}`);
-    core.setOutput('npm-publish-failed', 'true');
-    core.setOutput('npm-publish-error', String(error));
+    setOutput('npm-publish-failed', 'true');
+    setOutput('npm-publish-error', String(error));
 
     // 如果用户要求严格模式，则抛出错误
-    const strictMode = core.getInput('npm-publish-strict')?.toLowerCase() === 'true';
+    const strictMode = getInput('npm-publish-strict')?.toLowerCase() === 'true';
     if (strictMode) {
       throw error;
     }

@@ -1,12 +1,12 @@
 import { context, getOctokit } from '@actions/github';
 import { COMMENT_CONFIG, COMMENT_TEMPLATES } from './constants';
-import core, { logger } from './core';
-import { ActionError, type PRData, type VersionPreviewData } from './types';
+import { getInput, logger } from './core';
+import type { PRData, VersionPreviewData } from './types';
 
 // ==================== GitHub API 客户端 ====================
 
 /** 初始化 GitHub API 客户端 */
-const octokit = getOctokit(core.getInput('token', { required: true }));
+const octokit = getOctokit(getInput('token', { required: true }));
 
 // ==================== PR 工具函数 ====================
 
@@ -45,11 +45,16 @@ export function getCurrentPRNumber(pr: PRData | null): number | null {
 /**
  * 创建或更新 PR 评论
  */
-export async function updatePRComment(prNumber: number, commentBody: string, identifier: string = `## ${COMMENT_CONFIG.title}`): Promise<void> {
+export async function updatePRComment(
+  prNumber: number,
+  commentBody: string,
+  identifier = `## ${COMMENT_CONFIG.title}`,
+): Promise<void> {
   try {
     const { data: comments } = await octokit.rest.issues.listComments({
       owner: context.repo.owner,
       repo: context.repo.repo,
+      // biome-ignore lint/style/useNamingConvention: GitHub API requires this property name
       issue_number: prNumber,
     });
 
@@ -61,6 +66,7 @@ export async function updatePRComment(prNumber: number, commentBody: string, ide
       await octokit.rest.issues.updateComment({
         owner: context.repo.owner,
         repo: context.repo.repo,
+        // biome-ignore lint/style/useNamingConvention: GitHub API requires this property name
         comment_id: existingComment.id,
         body: commentBody,
       });
@@ -69,6 +75,7 @@ export async function updatePRComment(prNumber: number, commentBody: string, ide
       await octokit.rest.issues.createComment({
         owner: context.repo.owner,
         repo: context.repo.repo,
+        // biome-ignore lint/style/useNamingConvention: GitHub API requires this property name
         issue_number: prNumber,
         body: commentBody,
       });
@@ -76,34 +83,6 @@ export async function updatePRComment(prNumber: number, commentBody: string, ide
     }
   } catch (error) {
     logger.warning(`更新 PR 评论失败: ${error}`);
-  }
-}
-
-/**
- * 创建版本管理评论
- */
-export async function createVersionPreviewComment(prNumber: number, data: VersionPreviewData): Promise<void> {
-  try {
-    const commentBody = COMMENT_TEMPLATES.VERSION_PREVIEW(data);
-    await updatePRComment(prNumber, commentBody);
-  } catch (error) {
-    throw new ActionError(`创建版本管理评论失败: ${error}`, 'createVersionPreviewComment', error);
-  }
-}
-
-/**
- * 创建版本跳过评论
- */
-export async function createVersionSkipComment(
-  prNumber: number,
-  targetBranch: string,
-  baseVersion: string | null,
-): Promise<void> {
-  try {
-    const commentBody = COMMENT_TEMPLATES.VERSION_SKIP(targetBranch, baseVersion);
-    await updatePRComment(prNumber, commentBody);
-  } catch (error) {
-    throw new ActionError(`创建版本跳过评论失败: ${error}`, 'createVersionSkipComment', error);
   }
 }
 
@@ -117,6 +96,40 @@ export async function createErrorComment(prNumber: number, errorMessage: string)
   } catch (error) {
     logger.warning(`创建错误评论失败: ${error}`);
   }
+}
+
+/**
+ * 处理预览模式 - 在PR中显示版本预览信息
+ */
+export async function handlePreviewMode(
+  pr: PRData | null,
+  sourceBranch: string,
+  targetBranch: string,
+  baseVersion: string | null,
+  newVersion: string | null,
+): Promise<void> {
+  const prNumber = getCurrentPRNumber(pr);
+  if (!prNumber) {
+    logger.warning('无法获取 PR 号，跳过评论更新');
+    return;
+  }
+
+  // 构建版本预览数据
+  const previewData: VersionPreviewData = {
+    sourceBranch,
+    targetBranch,
+    currentVersion: baseVersion || undefined,
+    nextVersion: newVersion || '无需升级',
+  };
+
+  // 根据是否有新版本选择合适的模板
+  const commentBody = newVersion
+    ? COMMENT_TEMPLATES.VERSION_PREVIEW(previewData)
+    : COMMENT_TEMPLATES.VERSION_SKIP(targetBranch, baseVersion);
+
+  // 更新PR评论
+  await updatePRComment(prNumber, commentBody);
+  logger.info(`已更新 PR #${prNumber} 的版本预览信息`);
 }
 
 // /**
@@ -146,37 +159,3 @@ export async function createErrorComment(prNumber: number, errorMessage: string)
 //   logger.info(`❌ 未检测到明确的版本标签 (major/minor/patch)，跳过版本升级`);
 //   return '';
 // }
-
-/**
- * 处理预览模式逻辑
- */
-export async function handlePreviewMode(
-  pr: PRData | null,
-  sourceBranch: string,
-  targetBranch: string,
-  baseVersion: string | null,
-  newVersion: string | null,
-): Promise<void> {
-  const prNumber = getCurrentPRNumber(pr);
-  if (!prNumber) {
-    logger.warning('无法获取 PR 号，跳过评论更新');
-    return;
-  }
-
-  try {
-    if (!newVersion) {
-      await createVersionSkipComment(prNumber, targetBranch, baseVersion);
-    } else {
-      // 显示版本管理
-      await createVersionPreviewComment(prNumber, {
-        sourceBranch,
-        targetBranch,
-        currentVersion: baseVersion || undefined,
-        nextVersion: newVersion,
-      });
-    }
-  } catch (error) {
-    logger.error(`预览模式处理失败: ${error}`);
-    await createErrorComment(prNumber, `预览处理失败: ${error}`);
-  }
-}

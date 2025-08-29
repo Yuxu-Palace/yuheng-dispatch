@@ -1,10 +1,77 @@
 import { exec } from '@actions/exec';
-import { COMMIT_TEMPLATES } from './constants';
-import core, { logger } from './core';
-import { ActionError, type PRData } from './types';
-import { addVersionPrefix } from './version';
+import { COMMIT_TEMPLATES, LABEL_TO_CHANGELOG_TYPE } from './constants';
+import { getInput, logger } from './core';
+import type { PRData } from './types';
+import { addVersionPrefix, commitAndPushFile, hasFileChanges } from './utils';
 
 // ==================== CHANGELOG 操作 ====================
+
+/**
+ * 从PR标签推断变更类型
+ */
+function getChangeTypeFromLabels(labels: { name: string }[] | undefined): string {
+  if (!labels) {
+    return '📝 Changes';
+  }
+
+  // 优先查找特定标签类型
+  for (const label of labels) {
+    if (LABEL_TO_CHANGELOG_TYPE[label.name]) {
+      return LABEL_TO_CHANGELOG_TYPE[label.name];
+    }
+  }
+
+  // 基于版本标签推断
+  const labelNames = labels.map((label) => label.name);
+  if (labelNames.includes('major')) {
+    return '💥 Breaking Changes';
+  }
+  if (labelNames.includes('minor')) {
+    return '✨ Features';
+  }
+  if (labelNames.includes('patch')) {
+    return '🐛 Bug Fixes';
+  }
+
+  return '📝 Changes';
+}
+
+/**
+ * 从PR body中提取section内容
+ */
+function extractSectionFromBody(body: string): string {
+  const sections = [
+    '### Changes',
+    '## Changes',
+    "### What's Changed",
+    "## What's Changed",
+    '### Summary',
+    '## Summary',
+  ];
+
+  for (const section of sections) {
+    const sectionIndex = body.indexOf(section);
+    if (sectionIndex !== -1) {
+      const sectionContent = body.substring(sectionIndex + section.length);
+      const nextSectionIndex = sectionContent.search(/^##/m);
+      const content = nextSectionIndex !== -1 ? sectionContent.substring(0, nextSectionIndex) : sectionContent;
+
+      const cleanContent = content
+        .trim()
+        .split('\\n')
+        .filter((line) => line.trim())
+        .slice(0, 5) // 最多5行
+        .map((line) => (line.startsWith('- ') ? `  ${line}` : `  - ${line}`))
+        .join('\\n');
+
+      if (cleanContent) {
+        return `${cleanContent}\\n`;
+      }
+    }
+  }
+
+  return '';
+}
 
 /**
  * 基于PR信息生成CHANGELOG条目
@@ -14,81 +81,19 @@ async function generateChangelogFromPR(pr: PRData | null, version: string): Prom
     return `### Changes\\n- Version ${version} release\\n`;
   }
 
-  // PR标签到CHANGELOG类型的映射
-  const labelToChangelogType: Record<string, string> = {
-    major: '💥 Breaking Changes',
-    minor: '✨ Features',
-    patch: '🐛 Bug Fixes',
-    enhancement: '⚡ Improvements',
-    performance: '🚀 Performance',
-    security: '🔒 Security',
-    documentation: '📚 Documentation',
-    dependencies: '⬆️ Dependencies',
-  };
+  // 推断变更类型
+  const changeType = getChangeTypeFromLabels(pr.labels);
 
-  // 从PR标签推断变更类型
-  let changeType = '📝 Changes';
-  if (pr.labels) {
-    for (let i = 0; i < pr.labels.length; i++) {
-      const label = pr.labels[i];
-      if (labelToChangelogType[label.name]) {
-        changeType = labelToChangelogType[label.name];
-        break;
-      }
-    }
-
-    // 如果没找到特定类型，基于版本标签推断
-    if (changeType === '📝 Changes') {
-      const versionLabels = pr.labels.map((l) => l.name);
-      if (versionLabels.includes('major')) changeType = '💥 Breaking Changes';
-      else if (versionLabels.includes('minor')) changeType = '✨ Features';
-      else if (versionLabels.includes('patch')) changeType = '🐛 Bug Fixes';
-    }
-  }
-
-  // 构建CHANGELOG条目
-  let changelogEntry = `### ${changeType}\\n`;
-
-  // 添加PR标题和链接
-  const prUrl = pr.html_url;
+  // 构建基础条目
   const prTitle = pr.title || `PR #${pr.number}`;
+  const prUrl = pr.html_url;
+  let changelogEntry = `### ${changeType}\\n`;
   changelogEntry += `- ${prTitle} ([#${pr.number}](${prUrl}))\\n`;
 
-  // 如果PR有body，提取关键信息
+  // 添加PR body的相关内容
   if (pr.body && pr.body.trim()) {
-    const body = pr.body.trim();
-
-    // 查找特定的section（如 "### Changes", "## What's Changed" 等）
-    const sections = [
-      '### Changes',
-      '## Changes',
-      "### What's Changed",
-      "## What's Changed",
-      '### Summary',
-      '## Summary',
-    ];
-    for (let i = 0; i < sections.length; i++) {
-      const section = sections[i];
-      const sectionIndex = body.indexOf(section);
-      if (sectionIndex !== -1) {
-        const sectionContent = body.substring(sectionIndex + section.length);
-        const nextSectionIndex = sectionContent.search(/^##/m);
-        const content = nextSectionIndex !== -1 ? sectionContent.substring(0, nextSectionIndex) : sectionContent;
-
-        const cleanContent = content
-          .trim()
-          .split('\\n')
-          .filter((line) => line.trim())
-          .slice(0, 5) // 最多5行
-          .map((line) => (line.startsWith('- ') ? `  ${line}` : `  - ${line}`))
-          .join('\\n');
-
-        if (cleanContent) {
-          changelogEntry += `${cleanContent}\\n`;
-          break;
-        }
-      }
-    }
+    const bodyContent = extractSectionFromBody(pr.body.trim());
+    changelogEntry += bodyContent;
   }
 
   return changelogEntry;
@@ -97,9 +102,9 @@ async function generateChangelogFromPR(pr: PRData | null, version: string): Prom
 /**
  * 更新 CHANGELOG - 基于PR信息生成
  */
-export async function updateChangelog(pr: PRData | null = null, version: string = ''): Promise<void> {
+export async function updateChangelog(pr: PRData | null = null, version = ''): Promise<void> {
   // 检查是否启用CHANGELOG生成
-  const enableChangelog = core.getInput('enable-changelog')?.toLowerCase() !== 'false';
+  const enableChangelog = getInput('enable-changelog')?.toLowerCase() !== 'false';
   if (!enableChangelog) {
     logger.info('CHANGELOG 生成已禁用，跳过');
     return;
@@ -225,7 +230,6 @@ async function fallbackToConventionalChangelog(): Promise<void> {
  * 检查CHANGELOG文件是否有变化
  */
 export async function hasChangelogChanges(): Promise<boolean> {
-  const { hasFileChanges } = await import('./git');
   return await hasFileChanges('CHANGELOG.md');
 }
 
@@ -233,7 +237,6 @@ export async function hasChangelogChanges(): Promise<boolean> {
  * 提交CHANGELOG文件更改
  */
 export async function commitChangelog(version: string, targetBranch: string): Promise<void> {
-  const { commitAndPushFile } = await import('./git');
   const fullVersion = addVersionPrefix(version);
   await commitAndPushFile('CHANGELOG.md', COMMIT_TEMPLATES.CHANGELOG_UPDATE(fullVersion), targetBranch as any);
   logger.info('✅ CHANGELOG 更新已提交');

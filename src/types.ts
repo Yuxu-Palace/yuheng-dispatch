@@ -1,5 +1,4 @@
 import type { getOctokit } from '@actions/github';
-import type { ReleaseType } from 'semver';
 import { SUPPORTED_BRANCHES } from './constants';
 
 // ==================== 基础类型定义 ====================
@@ -46,6 +45,16 @@ export interface BranchSyncResult {
   error?: string;
 }
 
+export interface PRWorkflowInfo {
+  pr: PRData;
+  sourceBranch: string;
+  targetBranch: SupportedBranch;
+  prNumber: number;
+  isMerged: boolean;
+  isDryRun: boolean;
+  eventType: string;
+}
+
 // ==================== 常用类型守卫 ====================
 
 export function isSupportedBranch(branch: string): branch is SupportedBranch {
@@ -59,13 +68,14 @@ export function isSupportedBranch(branch: string): branch is SupportedBranch {
 // ==================== 错误处理类型 ====================
 
 export class ActionError extends Error {
-  constructor(
-    message: string,
-    public readonly context: string,
-    public readonly originalError?: unknown,
-  ) {
+  readonly context: string;
+  readonly originalError?: unknown;
+
+  constructor(message: string, context: string, originalError?: unknown) {
     super(message);
     this.name = 'ActionError';
+    this.context = context;
+    this.originalError = originalError;
   }
 }
 

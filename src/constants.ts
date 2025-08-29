@@ -1,32 +1,32 @@
-import core from './core';
+import { getInput } from './core';
+import type { VersionPreviewData } from './types';
 
 // ==================== 配置常量 ====================
 
-export const SUPPORTED_BRANCHES = core
-  .getInput('supported-branches')
+export const SUPPORTED_BRANCHES = getInput('supported-branches')
   ?.split(',')
-  .map((b) => b.trim()) || ['main', 'beta', 'alpha'];
+  .map((branch) => branch.trim()) || ['main', 'beta', 'alpha'];
 
 /** 版本前缀配置 */
 export const VERSION_PREFIX_CONFIG = {
   /** 默认版本前缀 */
   default: 'v',
   /** 自定义前缀（可通过action输入覆盖） */
-  custom: core.getInput('version-prefix') || 'v',
+  custom: getInput('version-prefix') || 'v',
   /** 支持的前缀列表（用于兼容性处理） */
   supported: ['v', 'version-', 'ver-', 'rel-'],
 } as const;
 
 /** Git 用户配置 */
 export const GIT_USER_CONFIG = {
-  name: core.getInput('git-user-name') || 'GitHub Action',
-  email: core.getInput('git-user-email') || 'action@github.com',
+  name: getInput('git-user-name') || 'GitHub Action',
+  email: getInput('git-user-email') || 'action@github.com',
 } as const;
 
 /** 评论配置 */
 export const COMMENT_CONFIG = {
   /** 评论标题（可通过action输入覆盖） */
-  title: core.getInput('comment-title') || '📦 版本管理',
+  title: getInput('comment-title') || '📦 版本管理',
 } as const;
 
 /** 默认版本号 */
@@ -36,9 +36,21 @@ export const DEFAULT_VERSIONS = {
   alpha: '0.0.0-alpha.0',
 } as const;
 
-// ==================== 消息模板 ====================
+// ==================== CHANGELOG 相关常量 ====================
 
-import type { VersionPreviewData } from './types';
+/** PR标签到CHANGELOG类型的映射 */
+export const LABEL_TO_CHANGELOG_TYPE: Record<string, string> = {
+  major: '💥 Breaking Changes',
+  minor: '✨ Features',
+  patch: '🐛 Bug Fixes',
+  enhancement: '⚡ Improvements',
+  performance: '🚀 Performance',
+  security: '🔒 Security',
+  documentation: '📚 Documentation',
+  dependencies: '⬆️ Dependencies',
+};
+
+// ==================== 消息模板 ====================
 
 /** 评论模板 */
 export const COMMENT_TEMPLATES = {
