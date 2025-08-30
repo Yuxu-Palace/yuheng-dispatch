@@ -11,29 +11,23 @@ import { addVersionPrefix, commitAndPushFile, hasFileChanges } from './utils';
  */
 function getChangeTypeFromLabels(labels: { name: string }[] | undefined): string {
   if (!labels) {
-    return '📝 Changes';
+    return LABEL_TO_CHANGELOG_TYPE.other;
   }
 
-  // 优先查找特定标签类型
-  for (const label of labels) {
-    if (LABEL_TO_CHANGELOG_TYPE[label.name]) {
-      return LABEL_TO_CHANGELOG_TYPE[label.name];
-    }
-  }
-
-  // 基于版本标签推断
   const labelNames = labels.map((label) => label.name);
+
+  // 按优先级依次判断
   if (labelNames.includes('major')) {
-    return '💥 Breaking Changes';
+    return LABEL_TO_CHANGELOG_TYPE.major;
   }
   if (labelNames.includes('minor')) {
-    return '✨ Features';
+    return LABEL_TO_CHANGELOG_TYPE.minor;
   }
   if (labelNames.includes('patch')) {
-    return '🐛 Bug Fixes';
+    return LABEL_TO_CHANGELOG_TYPE.patch;
   }
 
-  return '📝 Changes';
+  return LABEL_TO_CHANGELOG_TYPE.other;
 }
 
 /**

@@ -48,6 +48,7 @@ export const LABEL_TO_CHANGELOG_TYPE: Record<string, string> = {
   security: '🔒 Security',
   documentation: '📚 Documentation',
   dependencies: '⬆️ Dependencies',
+  other: '📝 Changes',
 };
 
 // ==================== 消息模板 ====================
