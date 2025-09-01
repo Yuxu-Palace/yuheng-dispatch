@@ -1,4 +1,4 @@
-import { getInput } from '@actions/core';
+import { getInput } from './core';
 import type { VersionPreviewData } from './types';
 
 // ==================== 配置常量 ====================
@@ -14,7 +14,7 @@ const SUPPORTED_PREFIXES = ['v', 'version-', 'ver-', 'rel-'] as const;
 export const VERSION_PREFIX_CONFIG = {
   /** 默认版本前缀 */
   DEFAULT: 'v',
-  /** 自定义前缀（可通过action输入覆盖，如果不支持则使用默认） */
+  /** 自定义前缀（可通过 action 输入覆盖，如果不支持则使用默认） */
   CUSTOM: (() => {
     const customPrefix = getInput('version-prefix');
     if (!customPrefix) {
@@ -34,7 +34,7 @@ export const GIT_USER_CONFIG = {
 
 /** 评论配置 */
 export const COMMENT_CONFIG = {
-  /** 评论标题（可通过action输入覆盖） */
+  /** 评论标题（可通过 action 输入覆盖） */
   TITLE: getInput('comment-title') || '📦 版本管理',
 } as const;
 
@@ -47,7 +47,7 @@ export const DEFAULT_VERSIONS = {
 
 // ==================== CHANGELOG 相关常量 ====================
 
-/** PR标签到CHANGELOG类型的映射 */
+/** PR 标签到 CHANGELOG 类型的映射 */
 export const LABEL_TO_CHANGELOG_TYPE: Record<string, string> = {
   MAJOR: '💥 Breaking Changes',
   MINOR: '✨ Features',
@@ -103,7 +103,7 @@ export const ERROR_MESSAGES = {
   UNSUPPORTED_EVENT: (eventName: string) => `不支持的事件类型: ${eventName}`,
   INVALID_VERSION: (version: string) => `无效的版本号: ${version}`,
   MERGE_CONFLICT: (sourceBranch: string, targetBranch: string) =>
-    `无法自动解决 ${sourceBranch} -> ${targetBranch} 的合并冲突，已创建issue需要人工介入`,
+    `无法自动解决 ${sourceBranch} -> ${targetBranch} 的合并冲突，已创建 issue 需要人工介入`,
 } as const;
 
 // ==================== CHANGELOG 相关常量 ====================

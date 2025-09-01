@@ -1,3 +1,5 @@
+export { getInput, setFailed, setOutput } from '@actions/core';
+
 import * as core from '@actions/core';
 
 export const logger = {

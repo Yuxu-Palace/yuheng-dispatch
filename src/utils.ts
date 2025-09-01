@@ -12,9 +12,9 @@ import type { SupportedBranch } from './types';
 export interface VersionParseResult {
   /** 原始版本号 */
   original: string;
-  /** 用于package.json的纯净版本号 (semver格式，无前缀) */
+  /** 用于 package.json 的纯净版本号 (semver 格式，无前缀) */
   pkgVersion: string;
-  /** 用于git tag/发布的目标版本号 (带当前前缀) */
+  /** 用于 git tag/发布的目标版本号 (带当前前缀) */
   targetVersion: string;
   /** 当前使用的前缀 */
   prefix: string;
@@ -24,10 +24,20 @@ export interface VersionParseResult {
   hasCurrentPrefix: boolean;
 }
 
+// 版本解析缓存 - 避免重复计算相同版本号
+const versionParseCache = new Map<string, VersionParseResult>();
+
 /**
  * 解析版本号 - 一次性获取所有版本信息，避免重复计算
+ * 使用缓存机制提升性能，避免重复解析相同版本号
  */
 export function versionParse(version: string): VersionParseResult {
+  // 检查缓存
+  const cached = versionParseCache.get(version);
+  if (cached) {
+    return cached;
+  }
+
   const prefix = VERSION_PREFIX_CONFIG.CUSTOM;
   const supportedPrefixes = VERSION_PREFIX_CONFIG.SUPPORTED;
 
@@ -56,7 +66,7 @@ export function versionParse(version: string): VersionParseResult {
     clean = foundPrefix ? extractedClean : version;
   }
 
-  return {
+  const result: VersionParseResult = {
     original: version,
     pkgVersion: clean,
     targetVersion: `${prefix}${clean}`,
@@ -64,6 +74,28 @@ export function versionParse(version: string): VersionParseResult {
     hasPrefix: version !== clean, // 任何前缀（包括非当前前缀）
     hasCurrentPrefix,
   };
+
+  // 存入缓存
+  versionParseCache.set(version, result);
+
+  return result;
+}
+
+/**
+ * 获取版本解析缓存统计信息
+ */
+export function getVersionParseCacheStats(): { size: number; hitRate: number } {
+  return {
+    size: versionParseCache.size,
+    hitRate: 0, // 可以后续扩展统计命中率
+  };
+}
+
+/**
+ * 清理版本解析缓存
+ */
+export function clearVersionParseCache(): void {
+  versionParseCache.clear();
 }
 
 /**

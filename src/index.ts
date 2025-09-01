@@ -1,7 +1,6 @@
 import process from 'node:process';
-import { setFailed, setOutput } from '@actions/core';
 import { context } from '@actions/github';
-import { logger } from './core';
+import { logger, setFailed, setOutput } from './core';
 import { configureGitUser, syncBranches, updateVersionAndCreateTag } from './git';
 import { createErrorComment, getCurrentPRNumber, handlePreviewMode } from './pr';
 import type { PRData, PRWorkflowInfo, SupportedBranch } from './types';
@@ -29,7 +28,7 @@ async function handleExecutionMode(
 }
 
 /**
- * 验证事件类型并提取PR信息
+ * 验证事件类型并提取 PR 信息
  */
 function validateAndExtractPRInfo(): PRWorkflowInfo {
   if (context.eventName !== 'pull_request') {
@@ -73,19 +72,19 @@ function printDebugInfo(info: PRWorkflowInfo): void {
   const runId = process.env.GITHUB_RUN_ID;
   const runNumber = process.env.GITHUB_RUN_NUMBER;
 
-  logger.info('🔍 ===== Action运行实例信息 =====');
-  logger.info(`  - Action运行ID: ${runId}`);
-  logger.info(`  - Action运行编号: ${runNumber}`);
+  logger.info('🔍 ===== Action 运行实例信息 =====');
+  logger.info(`  - Action 运行 ID: ${runId}`);
+  logger.info(`  - Action 运行编号: ${runNumber}`);
   logger.info(`  - 工作流名称: ${process.env.GITHUB_WORKFLOW}`);
   logger.info(`  - 事件类型: ${context.eventName}`);
   logger.info(`  - 事件动作: ${context.payload.action}`);
-  logger.info('🔍 ===== PR信息 =====');
+  logger.info('🔍 ===== PR 信息 =====');
   logger.info(`  - prNumber: ${info.prNumber}`);
   logger.info(`  - 源分支 (head.ref): ${info.sourceBranch}`);
   logger.info(`  - 目标分支 (base.ref): ${info.targetBranch}`);
-  logger.info(`  - PR标题: ${info.pr.title || '无'}`);
+  logger.info(`  - PR 标题: ${info.pr.title || '无'}`);
   logger.info(`  - PR URL: ${info.pr.html_url || '无'}`);
-  logger.info('🔍 ===== Context完整信息 =====');
+  logger.info('🔍 ===== Context 完整信息 =====');
   logger.info(`  - context.sha: ${context.sha}`);
   logger.info(`  - context.ref: ${context.ref}`);
   logger.info(`  - context.payload keys: ${Object.keys(context.payload).join(', ')}`);
@@ -103,7 +102,7 @@ async function processVersionCalculation(
   // 获取基础版本（用于显示当前版本）
   const baseVersion = await getBaseVersion(info.targetBranch, info.sourceBranch, info.pr);
 
-  // 根据分支策略计算新版本号（策略内部自行判断是否需要PR标签）
+  // 根据分支策略计算新版本号（策略内部自行判断是否需要 PR 标签）
   const newVersion = await calculateNewVersion(info.targetBranch, info.sourceBranch, info.pr);
 
   // 改进日志输出，提供更多调试信息
@@ -137,7 +136,7 @@ async function executeWorkflow(
     logger.info('🚀 执行版本更新模式...');
 
     if (newVersion) {
-      // 有新版本：更新版本并同步分支 - 传递PR信息给CHANGELOG生成
+      // 有新版本：更新版本并同步分支 - 传递 PR 信息给 CHANGELOG 生成
       await handleExecutionMode(newVersion, info.targetBranch, info.pr);
       setOutput('next-version', newVersion);
       logger.info(`✅ 版本更新完成: ${newVersion}`);
@@ -154,13 +153,13 @@ async function executeWorkflow(
 }
 
 /**
- * 处理错误并创建PR评论
+ * 处理错误并创建 PR 评论
  */
 async function handleWorkflowError(error: unknown): Promise<void> {
   let errorMessage = '';
   if (error instanceof ActionError) {
     errorMessage = `${error.context}: ${error.message}`;
-    logger.error(`Action执行失败: ${error.message} (${error.context})`);
+    logger.error(`Action 执行失败: ${error.message} (${error.context})`);
     setFailed(errorMessage);
   } else {
     errorMessage = String(error);
@@ -168,7 +167,7 @@ async function handleWorkflowError(error: unknown): Promise<void> {
     setFailed(errorMessage);
   }
 
-  // 尝试在PR中创建错误评论（如果存在PR）
+  // 尝试在 PR 中创建错误评论（如果存在 PR）
   try {
     const prPayload = context.payload.pull_request;
     if (prPayload) {
@@ -188,7 +187,7 @@ async function handleWorkflowError(error: unknown): Promise<void> {
  */
 async function run(): Promise<void> {
   try {
-    // 1. 验证事件并提取PR信息
+    // 1. 验证事件并提取 PR 信息
     const workflowInfo = validateAndExtractPRInfo();
 
     // 2. 打印调试信息

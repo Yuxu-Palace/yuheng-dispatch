@@ -1,15 +1,14 @@
 import * as fs from 'node:fs';
-import { getInput } from '@actions/core';
 import { exec } from '@actions/exec';
 import { COMMIT_TEMPLATES, LABEL_TO_CHANGELOG_TYPE, PR_SECTION_PATTERNS } from './constants';
-import { logger } from './core';
+import { getInput, logger } from './core';
 import type { PRData } from './types';
 import { addVersionPrefix, commitAndPushFile, hasFileChanges } from './utils';
 
 // ==================== CHANGELOG 操作 ====================
 
 /**
- * 从PR标签推断变更类型
+ * 从 PR 标签推断变更类型
  */
 function getChangeTypeFromLabels(labels: { name: string }[] | undefined): string {
   if (!labels) {
@@ -33,10 +32,10 @@ function getChangeTypeFromLabels(labels: { name: string }[] | undefined): string
 }
 
 /**
- * 处理section内容：清理空行，限制行数，统一格式
+ * 处理 section 内容：清理空行，限制行数，统一格式
  */
 function processSectionContent(content: string): string {
-  const lines: string[] = content.trim().split('\\n');
+  const lines: string[] = content.trim().split('\n');
   const resultLines: string[] = [];
 
   for (let i = 0; i < lines.length && resultLines.length < 5; i++) {
@@ -48,11 +47,11 @@ function processSectionContent(content: string): string {
     resultLines.push(line.startsWith('- ') ? `  ${line}` : `  - ${line}`);
   }
 
-  return resultLines.length > 0 ? `${resultLines.join('\\n')}\\n` : '';
+  return resultLines.length > 0 ? `${resultLines.join('\n')}\n` : '';
 }
 
 /**
- * 从PR body中提取section内容
+ * 从 PR body 中提取 section 内容
  */
 function extractSectionFromBody(body: string): string {
   for (let i = 0; i < PR_SECTION_PATTERNS.length; i++) {
@@ -77,11 +76,11 @@ function extractSectionFromBody(body: string): string {
 }
 
 /**
- * 基于PR信息生成CHANGELOG条目
+ * 基于 PR 信息生成 CHANGELOG 条目
  */
 async function generateChangelogFromPR(pr: PRData | null, version: string): Promise<string> {
   if (!pr) {
-    return `### Changes\\n- Version ${version} release\\n`;
+    return `### Changes\n- Version ${version} release\n`;
   }
 
   // 推断变更类型
@@ -90,10 +89,10 @@ async function generateChangelogFromPR(pr: PRData | null, version: string): Prom
   // 构建基础条目
   const prTitle = pr.title || `PR #${pr.number}`;
   const prUrl = pr.html_url;
-  let changelogEntry = `### ${changeType}\\n`;
-  changelogEntry += `- ${prTitle} ([#${pr.number}](${prUrl}))\\n`;
+  let changelogEntry = `### ${changeType}\n`;
+  changelogEntry += `- ${prTitle} ([#${pr.number}](${prUrl}))\n`;
 
-  // 添加PR body的相关内容
+  // 添加 PR body 的相关内容
   if (pr.body && pr.body.trim()) {
     const bodyContent = extractSectionFromBody(pr.body.trim());
     changelogEntry += bodyContent;
@@ -103,10 +102,10 @@ async function generateChangelogFromPR(pr: PRData | null, version: string): Prom
 }
 
 /**
- * 更新 CHANGELOG - 基于PR信息生成
+ * 更新 CHANGELOG - 基于 PR 信息生成
  */
 export async function updateChangelog(pr: PRData | null = null, version = ''): Promise<void> {
-  // 检查是否启用CHANGELOG生成
+  // 检查是否启用 CHANGELOG 生成
   const enableChangelog = getInput('enable-changelog')?.toLowerCase() !== 'false';
   if (!enableChangelog) {
     logger.info('CHANGELOG 生成已禁用，跳过');
@@ -114,12 +113,12 @@ export async function updateChangelog(pr: PRData | null = null, version = ''): P
   }
 
   try {
-    logger.info('开始生成基于PR的 CHANGELOG...');
+    logger.info('开始生成基于 PR 的 CHANGELOG...');
 
     const currentDate = new Date().toISOString().split('T')[0];
     const versionTag = version.startsWith('v') ? version : `v${version}`;
 
-    // 生成基于PR的CHANGELOG条目
+    // 生成基于 PR 的 CHANGELOG 条目
     const changelogEntry = await generateChangelogFromPR(pr, version);
 
     const newEntry = `## [${versionTag}] - ${currentDate}
@@ -127,7 +126,8 @@ export async function updateChangelog(pr: PRData | null = null, version = ''): P
 ${changelogEntry}
 `;
 
-    // 读取现有CHANGELOG内容（使用 fs 替代 exec，提高性能）
+    // 读取现有 CHANGELOG 内容（使用 fs 替代 exec，提高性能）
+    // TODO 流式写入
     let existingContent = '';
     try {
       if (fs.existsSync('CHANGELOG.md')) {
@@ -159,50 +159,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     }
 
     // 插入新条目到第一个版本记录之前
-    const lines = existingContent.split('\\n');
+    const lines = existingContent.split('\n');
     let insertIndex = lines.length;
 
     // 查找第一个版本标题的位置
     for (let i = 0; i < lines.length; i++) {
-      if (lines[i].match(/^## \\[.*\\]/)) {
+      if (lines[i].match(/^## \[.*\]/)) {
         insertIndex = i;
         break;
       }
     }
 
     // 插入新条目
-    const entryLines = newEntry.split('\\n');
+    const entryLines = newEntry.split('\n');
     lines.splice(insertIndex, 0, ...entryLines);
 
     // 写回文件（使用 fs.writeFileSync 替代 shell 命令）
-    const newContent = lines.join('\\n');
+    const newContent = lines.join('\n');
     fs.writeFileSync('CHANGELOG.md', newContent, 'utf8');
 
     logger.info(`✅ CHANGELOG 已更新，添加版本 ${versionTag}`);
 
     // 显示新增的内容预览（限制大小，避免日志过多）
     try {
-      const previewLines = newContent.split('\\n').slice(0, 15);
-      const preview = previewLines.join('\\n');
+      const previewLines = newContent.split('\n').slice(0, 15);
+      const preview = previewLines.join('\n');
       logger.info('📋 CHANGELOG 预览:');
       logger.info(preview);
     } catch (error) {
-      logger.warning(`无法显示CHANGELOG预览: ${error}`);
+      logger.warning(`无法显示 CHANGELOG 预览: ${error}`);
     }
   } catch (error) {
-    logger.warning(`基于PR的CHANGELOG生成失败: ${error}`);
+    logger.warning(`基于 PR 的 CHANGELOG 生成失败: ${error}`);
 
-    // 如果失败，使用原来的conventional-changelog逻辑作为备用
+    // 如果失败，使用原来的 conventional-changelog 逻辑作为备用
     await fallbackToConventionalChangelog();
   }
 }
 
 /**
- * 备用方案：使用conventional-changelog
+ * 备用方案：使用 conventional-changelog
  */
 async function fallbackToConventionalChangelog(): Promise<void> {
   try {
-    logger.info('使用conventional-changelog作为备用方案...');
+    logger.info('使用 conventional-changelog 作为备用方案...');
 
     // 检查是否已安装，如果未安装则尝试本地安装（不使用-g）
     try {
@@ -225,28 +225,28 @@ async function fallbackToConventionalChangelog(): Promise<void> {
       }
     }
 
-    // 执行conventional-changelog，添加静默选项以减少日志噪音
+    // 执行 conventional-changelog，添加静默选项以减少日志噪音
     await exec(
       'npx',
       ['conventional-changelog-cli', '-p', 'conventionalcommits', '-i', 'CHANGELOG.md', '-s', '-r', '0'],
       { silent: true },
     );
 
-    logger.info('✅ 使用conventional-changelog生成完成');
+    logger.info('✅ 使用 conventional-changelog 生成完成');
   } catch (error) {
-    logger.warning(`备用CHANGELOG生成也失败: ${error}`);
+    logger.warning(`备用 CHANGELOG 生成失败: ${error}`);
   }
 }
 
 /**
- * 检查CHANGELOG文件是否有变化
+ * 检查 CHANGELOG 文件是否有变化
  */
 export async function hasChangelogChanges(): Promise<boolean> {
   return await hasFileChanges('CHANGELOG.md');
 }
 
 /**
- * 提交CHANGELOG文件更改
+ * 提交 CHANGELOG 文件更改
  */
 export async function commitChangelog(version: string, targetBranch: string): Promise<void> {
   const fullVersion = addVersionPrefix(version);

@@ -125,7 +125,7 @@ async function resolveVersionConflicts(
     // 只合并非冲突文件，跳过版本文件
     await execGit(['merge', sourceBranch, '--no-commit', '--no-ff']);
 
-    // 手动处理package.json版本冲突
+    // 手动处理 package.json 版本冲突
     const pkgPath = await resolvePackageJSON();
     const sourcePkg = await readPackageJSON(pkgPath);
 
@@ -147,7 +147,7 @@ async function resolveVersionConflicts(
 }
 
 /**
- * 报告合并冲突，创建issue
+ * 报告合并冲突，创建 issue
  */
 async function reportMergeConflict(
   sourceBranch: SupportedBranch,
@@ -179,7 +179,7 @@ async function reportMergeConflict(
 详细日志请查看 GitHub Actions 运行记录。
 
 ---
-*此issue由版本管理Action自动创建*`;
+*此 issue 由版本管理 Action 自动创建*`;
 
     await octokit.rest.issues.create({
       owner: context.repo.owner,
@@ -189,9 +189,9 @@ async function reportMergeConflict(
       labels: ['merge-conflict', 'automated', 'priority-high'],
     });
 
-    logger.info(`已创建合并冲突issue: ${issueTitle}`);
+    logger.info(`已创建合并冲突 issue: ${issueTitle}`);
   } catch (error) {
-    logger.error(`创建合并冲突issue失败: ${error}`);
+    logger.error(`创建合并冲突 issue 失败: ${error}`);
   }
 }
 
@@ -230,7 +230,7 @@ async function handleMergeConflict(
     } catch (manualError) {
       logger.error(`手动解决冲突失败: ${manualError}`);
 
-      // 第四步：最后手段 - 创建issue报告冲突
+      // 第四步：最后手段 - 创建 issue 报告冲突
       await reportMergeConflict(sourceBranch, targetBranch, sourceVersion);
       throw new ActionError(ERROR_MESSAGES.MERGE_CONFLICT(sourceBranch, targetBranch), 'handleMergeConflict');
     }
@@ -238,14 +238,14 @@ async function handleMergeConflict(
 }
 
 /**
- * 同步上游分支到下游分支 (使用merge)
+ * 同步上游分支到下游分支 (使用 merge)
  */
 async function syncDownstream(
   sourceBranch: SupportedBranch,
   targetBranch: SupportedBranch,
   sourceVersion: string,
 ): Promise<BranchSyncResult> {
-  logger.info(`开始merge同步 ${sourceBranch} -> ${targetBranch}`);
+  logger.info(`开始 merge 同步 ${sourceBranch} -> ${targetBranch}`);
 
   try {
     // 切换到目标分支
@@ -257,19 +257,19 @@ async function syncDownstream(
 
     try {
       await execGit(['merge', sourceBranch, '--no-edit', '--no-ff', '-m', commitMessage]);
-      logger.info(`${sourceBranch} -> ${targetBranch} merge成功`);
+      logger.info(`${sourceBranch} -> ${targetBranch} merge 成功`);
     } catch {
-      logger.warning(`${sourceBranch} -> ${targetBranch} merge冲突，进行强制同步`);
+      logger.warning(`${sourceBranch} -> ${targetBranch} merge 冲突，进行强制同步`);
       await handleMergeConflict(sourceBranch, targetBranch, sourceVersion);
     }
 
     // 推送更改
     await execGit(['push', 'origin', targetBranch, '--force-with-lease']);
-    logger.info(`${targetBranch} 分支merge同步完成`);
+    logger.info(`${targetBranch} 分支 merge 同步完成`);
 
     return { success: true, version: sourceVersion };
   } catch (error) {
-    const errorMsg = `${sourceBranch} -> ${targetBranch} merge同步失败: ${error}`;
+    const errorMsg = `${sourceBranch} -> ${targetBranch} merge 同步失败: ${error}`;
     logger.error(errorMsg);
     return {
       success: false,
@@ -280,43 +280,43 @@ async function syncDownstream(
 }
 
 /**
- * 同步上游分支到下游分支 (使用rebase)
+ * 同步上游分支到下游分支 (使用 rebase)
  */
 async function syncDownstreamWithRebase(
   sourceBranch: SupportedBranch,
   targetBranch: SupportedBranch,
   sourceVersion: string,
 ): Promise<BranchSyncResult> {
-  logger.info(`开始rebase同步 ${sourceBranch} -> ${targetBranch}`);
+  logger.info(`开始 rebase 同步 ${sourceBranch} -> ${targetBranch}`);
 
   try {
     // 切换到目标分支
     await execGit(['fetch', 'origin', targetBranch]);
     await execGit(['switch', targetBranch]);
 
-    // 尝试rebase源分支
+    // 尝试 rebase 源分支
     try {
       await execGit(['rebase', sourceBranch]);
-      logger.info(`${sourceBranch} -> ${targetBranch} rebase成功`);
+      logger.info(`${sourceBranch} -> ${targetBranch} rebase 成功`);
     } catch {
-      logger.warning(`${sourceBranch} -> ${targetBranch} rebase冲突，尝试处理`);
+      logger.warning(`${sourceBranch} -> ${targetBranch} rebase 冲突，尝试处理`);
 
-      // 对于rebase冲突，我们采用更保守的策略
+      // 对于 rebase 冲突，我们采用更保守的策略
       await execGit(['rebase', '--abort']);
 
-      // 改用merge策略作为fallback
+      // 改用 merge 策略作为 fallback
       const commitMessage = getCommitMessage(sourceBranch, targetBranch, sourceVersion);
       await execGit(['merge', sourceBranch, '--no-edit', '--no-ff', '-m', commitMessage]);
-      logger.info('rebase失败，改用merge策略完成同步');
+      logger.info('rebase 失败，改用 merge 策略完成同步');
     }
 
     // 推送更改
     await execGit(['push', 'origin', targetBranch, '--force-with-lease']);
-    logger.info(`${targetBranch} 分支rebase同步完成`);
+    logger.info(`${targetBranch} 分支 rebase 同步完成`);
 
     return { success: true, version: sourceVersion };
   } catch (error) {
-    const errorMsg = `${sourceBranch} -> ${targetBranch} rebase同步失败: ${error}`;
+    const errorMsg = `${sourceBranch} -> ${targetBranch} rebase 同步失败: ${error}`;
     logger.error(errorMsg);
     return {
       success: false,
@@ -330,33 +330,33 @@ async function syncDownstreamWithRebase(
  * 执行分支同步 - 根据新的合并策略
  */
 export async function syncBranches(targetBranch: SupportedBranch, newVersion: string): Promise<BranchSyncResult[]> {
-  // 🔧 修复：只有在push事件时才检查自动同步提交，PR merge事件需要完整同步链
+  // 🔧 修复：只有在 push 事件时才检查自动同步提交，PR merge 事件需要完整同步链
   const isPushEvent = context.eventName === 'push';
   if (isPushEvent && isAutoSyncCommit()) {
-    logger.info('检测到Push事件的自动同步提交，跳过分支同步避免级联触发');
+    logger.info('检测到 Push 事件的自动同步提交，跳过分支同步避免级联触发');
     return [{ success: true }];
   }
 
   const results: BranchSyncResult[] = [];
 
   if (targetBranch === 'main') {
-    // Main分支更新后：使用rebase向下游Beta分支同步
-    logger.info('Main分支更新，使用rebase向Beta分支同步');
+    // Main 分支更新后：使用 rebase 向下游 Beta 分支同步
+    logger.info('Main 分支更新，使用 rebase 向 Beta 分支同步');
 
     const betaResult = await syncDownstreamWithRebase('main', 'beta', newVersion);
     results.push(betaResult);
 
     if (betaResult.success) {
-      // Beta分支同步成功后，继续向Alpha分支merge
-      logger.info('Main → Beta 同步成功，继续 Beta → Alpha merge同步');
+      // Beta 分支同步成功后，继续向 Alpha 分支 merge
+      logger.info('Main → Beta 同步成功，继续 Beta → Alpha merge 同步');
       const alphaResult = await syncDownstream('beta', 'alpha', newVersion);
       results.push(alphaResult);
     } else {
       logger.warning('Main → Beta 同步失败，跳过 Beta → Alpha 级联同步');
     }
   } else if (targetBranch === 'beta') {
-    // Beta分支更新后：使用merge向下游Alpha分支同步
-    logger.info('Beta分支更新，使用merge向Alpha分支同步');
+    // Beta 分支更新后：使用 merge 向下游 Alpha 分支同步
+    logger.info('Beta 分支更新，使用 merge 向 Alpha 分支同步');
     const result = await syncDownstream('beta', 'alpha', newVersion);
     results.push(result);
   }
@@ -368,7 +368,7 @@ export async function syncBranches(targetBranch: SupportedBranch, newVersion: st
 // ==================== 版本更新和标签创建 ====================
 
 /**
- * 更新版本并创建标签 - 支持基于PR的CHANGELOG生成和npm发布
+ * 更新版本并创建标签 - 支持基于 PR 的 CHANGELOG 生成和 npm 发布
  */
 export async function updateVersionAndCreateTag(
   newVersion: string,
@@ -386,20 +386,20 @@ export async function updateVersionAndCreateTag(
     // 提交版本更改并推送
     await commitAndPushVersion(newVersion, targetBranch);
 
-    // 🎯 在打tag后更新 CHANGELOG - 使用PR信息
+    // 🎯 在打 tag 后更新 CHANGELOG - 使用 PR 信息
     await updateChangelog(pr, newVersion);
 
-    // 检查是否有 CHANGELOG 更改需要提交 - 每次版本发布都必须有CHANGELOG变更
+    // 检查是否有 CHANGELOG 更改需要提交 - 每次版本发布都必须有 CHANGELOG 变更
     const hasChanges = await hasChangelogChanges();
     if (hasChanges) {
       await commitChangelog(newVersion, targetBranch);
     } else {
-      const errorMessage = 'CHANGELOG 未生成任何内容，这不应该发生。请检查PR描述或提交历史是否包含足够的变更信息。';
+      const errorMessage = 'CHANGELOG 未生成任何内容，这不应该发生。请检查 PR 描述或提交历史是否包含足够的变更信息。';
       logger.error(errorMessage);
-      throw new ActionError(errorMessage, 'CHANGELOG生成失败');
+      throw new ActionError(errorMessage, 'CHANGELOG 生成失败');
     }
 
-    // 🚀 发布到npm - 只对目标分支版本发布
+    // 🚀 发布到 npm - 只对目标分支版本发布
     const { handleNpmPublish } = await import('./npm');
     await handleNpmPublish(newVersion, targetBranch);
   } catch (error) {
