@@ -1,6 +1,7 @@
+import { getInput } from '@actions/core';
 import { context, getOctokit } from '@actions/github';
 import { COMMENT_CONFIG, COMMENT_TEMPLATES } from './constants';
-import { getInput, logger } from './core';
+import { logger } from './core';
 import type { PRData, VersionPreviewData } from './types';
 
 // ==================== GitHub API 客户端 ====================
@@ -48,7 +49,7 @@ export function getCurrentPRNumber(pr: PRData | null): number | null {
 export async function updatePRComment(
   prNumber: number,
   commentBody: string,
-  identifier = `## ${COMMENT_CONFIG.title}`,
+  identifier = `## ${COMMENT_CONFIG.TITLE}`,
 ): Promise<void> {
   try {
     const { data: comments } = await octokit.rest.issues.listComments({

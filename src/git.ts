@@ -4,8 +4,8 @@ import { readPackageJSON, resolvePackageJSON, writePackageJSON } from 'pkg-types
 import { commitChangelog, hasChangelogChanges, updateChangelog } from './changelog';
 import { COMMIT_TEMPLATES, ERROR_MESSAGES, GIT_USER_CONFIG } from './constants';
 import { logger } from './core';
-import { ActionError, type BranchSyncResult, type PRData, type SupportedBranch } from './types';
-import { addVersionPrefix, cleanVersion, execGit } from './utils';
+import type { BranchSyncResult, PRData, SupportedBranch } from './types';
+import { ActionError, execGit, versionParse } from './utils';
 import { updatePackageVersion } from './version';
 
 // ==================== Git 基础操作 ====================
@@ -15,8 +15,8 @@ import { updatePackageVersion } from './version';
  */
 export async function configureGitUser(): Promise<void> {
   logger.info('配置 Git 用户信息');
-  await execGit(['config', '--global', 'user.name', GIT_USER_CONFIG.name]);
-  await execGit(['config', '--global', 'user.email', GIT_USER_CONFIG.email]);
+  await execGit(['config', '--global', 'user.name', GIT_USER_CONFIG.NAME]);
+  await execGit(['config', '--global', 'user.email', GIT_USER_CONFIG.EMAIL]);
 }
 
 /**
@@ -24,8 +24,7 @@ export async function configureGitUser(): Promise<void> {
  */
 export async function commitAndPushVersion(version: string, targetBranch: SupportedBranch): Promise<void> {
   try {
-    const packageVersion = cleanVersion(version);
-    const fullVersion = addVersionPrefix(version);
+    const { pkgVersion: packageVersion, targetVersion: fullVersion } = versionParse(version);
 
     // 提交版本更改
     await execGit(['add', '.']);
@@ -390,12 +389,14 @@ export async function updateVersionAndCreateTag(
     // 🎯 在打tag后更新 CHANGELOG - 使用PR信息
     await updateChangelog(pr, newVersion);
 
-    // 检查是否有 CHANGELOG 更改需要提交
+    // 检查是否有 CHANGELOG 更改需要提交 - 每次版本发布都必须有CHANGELOG变更
     const hasChanges = await hasChangelogChanges();
     if (hasChanges) {
       await commitChangelog(newVersion, targetBranch);
     } else {
-      logger.info('CHANGELOG 无更改，跳过提交');
+      const errorMessage = 'CHANGELOG 未生成任何内容，这不应该发生。请检查PR描述或提交历史是否包含足够的变更信息。';
+      logger.error(errorMessage);
+      throw new ActionError(errorMessage, 'CHANGELOG生成失败');
     }
 
     // 🚀 发布到npm - 只对目标分支版本发布

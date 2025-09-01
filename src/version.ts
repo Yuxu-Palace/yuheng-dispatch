@@ -3,8 +3,15 @@ import semver, { type ReleaseType } from 'semver';
 import { DEFAULT_VERSIONS } from './constants';
 import { logger } from './core';
 import { createErrorComment, getCurrentPRNumber } from './pr';
-import { ActionError, type PRData, type SupportedBranch, type VersionSummary } from './types';
-import { addVersionPrefix, cleanVersion, execGitWithOutput, getVersionPrefix, normalizeVersion } from './utils';
+import type { PRData, SupportedBranch, VersionSummary } from './types';
+import {
+  ActionError,
+  addVersionPrefix,
+  cleanVersion,
+  execGitWithOutput,
+  getVersionPrefix,
+  normalizeVersion,
+} from './utils';
 
 // ==================== 版本管理辅助函数 ====================
 
@@ -118,7 +125,7 @@ export function getBranchType(version: string): string {
 /**
  * 创建默认版本（带正确前缀）
  */
-export function createDefaultVersion(type: keyof typeof DEFAULT_VERSIONS = 'base'): string {
+export function createDefaultVersion(type: keyof typeof DEFAULT_VERSIONS = 'BASE'): string {
   return addVersionPrefix(DEFAULT_VERSIONS[type]);
 }
 
@@ -242,12 +249,13 @@ class VersionManager {
     const versions = [this.cache.main, this.cache.beta, this.cache.alpha].filter(Boolean);
 
     if (versions.length === 0) {
-      return createDefaultVersion('base');
+      return createDefaultVersion('BASE');
     }
 
     // 找到最高的基础版本号
     let highestBaseVersion = '0.0.0';
-    for (const version of versions) {
+    for (let i = 0; i < versions.length; i++) {
+      const version = versions[i];
       if (version) {
         const baseVersion = getBaseVersionString(version);
         if (semver.gt(baseVersion, highestBaseVersion)) {
@@ -588,7 +596,7 @@ async function getAlphaBaseVersion(sourceBranch: string, pr: PRData | null): Pro
 
   if (!currentAlphaVersion) {
     // 没有Alpha版本，基于Main分支版本开始
-    const baseVersion = mainVersion || createDefaultVersion('base');
+    const baseVersion = mainVersion || createDefaultVersion('BASE');
     logger.info(`📌 Alpha分支基础版本: ${baseVersion} (无Alpha版本，基于Main版本)`);
     return baseVersion;
   }
@@ -599,9 +607,9 @@ async function getAlphaBaseVersion(sourceBranch: string, pr: PRData | null): Pro
   if (alphaBaseVersion === mainBaseVersion) {
     // Alpha基础号与Main一致，说明是新功能要进入Alpha测试
     logger.info(
-      `📌 Alpha分支基础版本: ${mainVersion || createDefaultVersion('base')} (Alpha基础号与Main一致，准备新功能测试)`,
+      `📌 Alpha分支基础版本: ${mainVersion || createDefaultVersion('BASE')} (Alpha基础号与Main一致，准备新功能测试)`,
     );
-    return mainVersion || createDefaultVersion('base');
+    return mainVersion || createDefaultVersion('BASE');
   }
   // Alpha基础号与Main不一致，说明已有新功能在Alpha测试
   logger.info(`📌 Alpha分支基础版本: ${currentAlphaVersion} (Alpha基础号与Main不一致，已有功能在测试)`);

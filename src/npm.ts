@@ -1,7 +1,8 @@
+import { getInput, setOutput } from '@actions/core';
 import { exec } from '@actions/exec';
-import { getInput, logger, setOutput } from './core';
-import { ActionError, type SupportedBranch } from './types';
-import { cleanVersion } from './utils';
+import { logger } from './core';
+import type { SupportedBranch } from './types';
+import { ActionError, cleanVersion } from './utils';
 import { parseVersion } from './version';
 
 // ==================== NPM 发布功能 ====================

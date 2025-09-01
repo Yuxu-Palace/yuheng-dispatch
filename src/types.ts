@@ -1,5 +1,4 @@
 import type { getOctokit } from '@actions/github';
-import { SUPPORTED_BRANCHES } from './constants';
 
 // ==================== 基础类型定义 ====================
 
@@ -55,29 +54,9 @@ export interface PRWorkflowInfo {
   eventType: string;
 }
 
-// ==================== 常用类型守卫 ====================
-
-export function isSupportedBranch(branch: string): branch is SupportedBranch {
-  return SUPPORTED_BRANCHES.includes(branch);
-}
-
 // export function isValidReleaseType(type: string): type is ReleaseType {
 //   return ['major', 'minor', 'patch', 'premajor', 'preminor', 'prepatch', 'prerelease'].includes(type);
 // }
-
-// ==================== 错误处理类型 ====================
-
-export class ActionError extends Error {
-  readonly context: string;
-  readonly originalError?: unknown;
-
-  constructor(message: string, context: string, originalError?: unknown) {
-    super(message);
-    this.name = 'ActionError';
-    this.context = context;
-    this.originalError = originalError;
-  }
-}
 
 // export interface ErrorContext {
 //   operation: string;

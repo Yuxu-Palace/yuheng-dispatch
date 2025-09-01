@@ -1,60 +1,104 @@
 import * as fs from 'node:fs';
 import { exec } from '@actions/exec';
-import { VERSION_PREFIX_CONFIG } from './constants';
+import { SUPPORTED_BRANCHES, VERSION_PREFIX_CONFIG } from './constants';
 import { logger } from './core';
-import { ActionError, type SupportedBranch } from './types';
+import type { SupportedBranch } from './types';
 
 // ==================== 版本处理工具函数 ====================
+
+/**
+ * 版本解析结果接口
+ */
+export interface VersionParseResult {
+  /** 原始版本号 */
+  original: string;
+  /** 用于package.json的纯净版本号 (semver格式，无前缀) */
+  pkgVersion: string;
+  /** 用于git tag/发布的目标版本号 (带当前前缀) */
+  targetVersion: string;
+  /** 当前使用的前缀 */
+  prefix: string;
+  /** 版本是否有任何前缀 */
+  hasPrefix: boolean;
+  /** 版本是否有当前配置的前缀 */
+  hasCurrentPrefix: boolean;
+}
+
+/**
+ * 解析版本号 - 一次性获取所有版本信息，避免重复计算
+ */
+export function versionParse(version: string): VersionParseResult {
+  const prefix = VERSION_PREFIX_CONFIG.CUSTOM;
+  const supportedPrefixes = VERSION_PREFIX_CONFIG.SUPPORTED;
+
+  // 检查是否有当前前缀
+  const hasCurrentPrefix = version.startsWith(prefix);
+
+  let clean: string;
+
+  if (hasCurrentPrefix) {
+    // 如果有当前前缀，直接去除
+    clean = version.slice(prefix.length);
+  } else {
+    // 检查其他支持的前缀
+    let foundPrefix = false;
+    let extractedClean = '';
+    for (let i = 0; i < supportedPrefixes.length; i++) {
+      const supportedPrefix = supportedPrefixes[i];
+      if (version.startsWith(supportedPrefix)) {
+        extractedClean = version.slice(supportedPrefix.length);
+        foundPrefix = true;
+        break;
+      }
+    }
+
+    // 如果没有找到任何前缀，直接使用原版本
+    clean = foundPrefix ? extractedClean : version;
+  }
+
+  return {
+    original: version,
+    pkgVersion: clean,
+    targetVersion: `${prefix}${clean}`,
+    prefix,
+    hasPrefix: version !== clean, // 任何前缀（包括非当前前缀）
+    hasCurrentPrefix,
+  };
+}
 
 /**
  * 获取版本前缀
  */
 export function getVersionPrefix(): string {
-  return VERSION_PREFIX_CONFIG.custom;
+  return VERSION_PREFIX_CONFIG.CUSTOM;
 }
 
 /**
  * 移除版本号前缀，支持多种前缀格式
  */
 export function cleanVersion(version: string): string {
-  const currentPrefix = getVersionPrefix();
-
-  // 优先检查当前使用的前缀
-  if (version.startsWith(currentPrefix)) {
-    return version.slice(currentPrefix.length);
-  }
-
-  // 兼容处理：检查其他支持的前缀
-  for (let i = 0; i < VERSION_PREFIX_CONFIG.supported.length; i++) {
-    const supportedPrefix = VERSION_PREFIX_CONFIG.supported[i];
-    // 跳过已经检查过的当前前缀
-    if (supportedPrefix === currentPrefix) {
-      continue;
-    }
-
-    if (version.startsWith(supportedPrefix)) {
-      return version.slice(supportedPrefix.length);
-    }
-  }
-
-  // 如果没有找到任何前缀，直接返回原版本号
-  return version;
+  return versionParse(version).pkgVersion;
 }
 
 /**
  * 添加版本前缀
  */
 export function addVersionPrefix(version: string): string {
-  const prefix = getVersionPrefix();
-  const cleanVer = cleanVersion(version);
-  return `${prefix}${cleanVer}`;
+  return versionParse(version).targetVersion;
 }
 
 /**
  * 标准化版本号（确保使用正确的前缀）
  */
 export function normalizeVersion(version: string): string {
-  return addVersionPrefix(cleanVersion(version));
+  return versionParse(version).targetVersion;
+}
+
+/**
+ * 检查版本是否有当前配置的前缀
+ */
+export function hasVersionPrefix(version: string): boolean {
+  return versionParse(version).hasCurrentPrefix;
 }
 
 // ==================== Git 工具函数 ====================
@@ -147,4 +191,30 @@ export async function commitAndPushFile(
   } catch (error) {
     handleGitError(error, `提交和推送 ${filepath}`, true);
   }
+}
+
+// ==================== 错误处理类 ====================
+
+/**
+ * Action 自定义错误类
+ */
+export class ActionError extends Error {
+  readonly context: string;
+  readonly originalError?: unknown;
+
+  constructor(message: string, context: string, originalError?: unknown) {
+    super(message);
+    this.name = 'ActionError';
+    this.context = context;
+    this.originalError = originalError;
+  }
+}
+
+// ==================== 类型守卫函数 ====================
+
+/**
+ * 检查是否为支持的分支
+ */
+export function isSupportedBranch(branch: string): branch is SupportedBranch {
+  return SUPPORTED_BRANCHES.includes(branch);
 }

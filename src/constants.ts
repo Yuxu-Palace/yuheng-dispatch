@@ -1,4 +1,4 @@
-import { getInput } from './core';
+import { getInput } from '@actions/core';
 import type { VersionPreviewData } from './types';
 
 // ==================== 配置常量 ====================
@@ -7,48 +7,57 @@ export const SUPPORTED_BRANCHES = getInput('supported-branches')
   ?.split(',')
   .map((branch) => branch.trim()) || ['main', 'beta', 'alpha'];
 
+/** 支持的前缀列表（用于兼容性处理） */
+const SUPPORTED_PREFIXES = ['v', 'version-', 'ver-', 'rel-'] as const;
+
 /** 版本前缀配置 */
 export const VERSION_PREFIX_CONFIG = {
   /** 默认版本前缀 */
-  default: 'v',
-  /** 自定义前缀（可通过action输入覆盖） */
-  custom: getInput('version-prefix') || 'v',
+  DEFAULT: 'v',
+  /** 自定义前缀（可通过action输入覆盖，如果不支持则使用默认） */
+  CUSTOM: (() => {
+    const customPrefix = getInput('version-prefix');
+    if (!customPrefix) {
+      return 'v';
+    }
+    return SUPPORTED_PREFIXES.includes(customPrefix as any) ? customPrefix : 'v';
+  })(),
   /** 支持的前缀列表（用于兼容性处理） */
-  supported: ['v', 'version-', 'ver-', 'rel-'],
+  SUPPORTED: SUPPORTED_PREFIXES,
 } as const;
 
 /** Git 用户配置 */
 export const GIT_USER_CONFIG = {
-  name: getInput('git-user-name') || 'GitHub Action',
-  email: getInput('git-user-email') || 'action@github.com',
+  NAME: getInput('git-user-name') || 'GitHub Action',
+  EMAIL: getInput('git-user-email') || 'action@github.com',
 } as const;
 
 /** 评论配置 */
 export const COMMENT_CONFIG = {
   /** 评论标题（可通过action输入覆盖） */
-  title: getInput('comment-title') || '📦 版本管理',
+  TITLE: getInput('comment-title') || '📦 版本管理',
 } as const;
 
 /** 默认版本号 */
 export const DEFAULT_VERSIONS = {
-  base: '0.0.0',
-  beta: '0.0.0-beta.0',
-  alpha: '0.0.0-alpha.0',
+  BASE: '0.0.0',
+  BETA: '0.0.0-beta.0',
+  ALPHA: '0.0.0-alpha.0',
 } as const;
 
 // ==================== CHANGELOG 相关常量 ====================
 
 /** PR标签到CHANGELOG类型的映射 */
 export const LABEL_TO_CHANGELOG_TYPE: Record<string, string> = {
-  major: '💥 Breaking Changes',
-  minor: '✨ Features',
-  patch: '🐛 Bug Fixes',
-  enhancement: '⚡ Improvements',
-  performance: '🚀 Performance',
-  security: '🔒 Security',
-  documentation: '📚 Documentation',
-  dependencies: '⬆️ Dependencies',
-  other: '📝 Changes',
+  MAJOR: '💥 Breaking Changes',
+  MINOR: '✨ Features',
+  PATCH: '🐛 Bug Fixes',
+  ENHANCEMENT: '⚡ Improvements',
+  PERFORMANCE: '🚀 Performance',
+  SECURITY: '🔒 Security',
+  DOCUMENTATION: '📚 Documentation',
+  DEPENDENCIES: '⬆️ Dependencies',
+  OTHER: '📝 Changes',
 };
 
 // ==================== 消息模板 ====================
@@ -56,7 +65,7 @@ export const LABEL_TO_CHANGELOG_TYPE: Record<string, string> = {
 /** 评论模板 */
 export const COMMENT_TEMPLATES = {
   /** 版本管理评论模板 */
-  VERSION_PREVIEW: (data: VersionPreviewData) => `## ${COMMENT_CONFIG.title}
+  VERSION_PREVIEW: (data: VersionPreviewData) => `## ${COMMENT_CONFIG.TITLE}
 
 | 项目 | 值 |
 |------|-----|
@@ -68,7 +77,7 @@ export const COMMENT_TEMPLATES = {
 > ℹ️ 这是预览模式，合并 PR 后将自动创建 tag 并更新版本。`,
 
   /** 错误评论模板 */
-  ERROR: (errorMessage: string) => `## ${COMMENT_CONFIG.title}
+  ERROR: (errorMessage: string) => `## ${COMMENT_CONFIG.TITLE}
 
 ❌ **错误信息**
 
@@ -77,7 +86,7 @@ ${errorMessage}
 > 请确保在创建新功能之前，所有已有功能都已完成完整的发布流程（alpha → beta → main）。`,
 
   /** 版本跳过模板 */
-  VERSION_SKIP: (targetBranch: string, baseVersion: string | null) => `## ${COMMENT_CONFIG.title}
+  VERSION_SKIP: (targetBranch: string, baseVersion: string | null) => `## ${COMMENT_CONFIG.TITLE}
 
 | 项目 | 值 |
 |------|-----|
@@ -96,6 +105,18 @@ export const ERROR_MESSAGES = {
   MERGE_CONFLICT: (sourceBranch: string, targetBranch: string) =>
     `无法自动解决 ${sourceBranch} -> ${targetBranch} 的合并冲突，已创建issue需要人工介入`,
 } as const;
+
+// ==================== CHANGELOG 相关常量 ====================
+
+/** PR Section 匹配模式 */
+export const PR_SECTION_PATTERNS = [
+  '### Changes',
+  '## Changes',
+  "### What's Changed",
+  "## What's Changed",
+  '### Summary',
+  '## Summary',
+] as const;
 
 /** 提交消息模板 */
 export const COMMIT_TEMPLATES = {
