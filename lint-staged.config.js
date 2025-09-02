@@ -3,5 +3,5 @@
  * @type {import('lint-staged').Configuration}
  */
 export default {
-  '*.{ts}': ['pnpm format', 'pnpm check'],
+  'src/**/*.{ts}': ['pnpm format', 'pnpm check'],
 };

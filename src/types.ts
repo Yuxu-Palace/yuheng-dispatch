@@ -13,12 +13,6 @@ export interface VersionInfo {
   betaTag: string | null;
 }
 
-// export interface EventInfo {
-//   targetBranch: SupportedBranch;
-//   isDryRun: boolean;
-//   pr: PRData | null;
-// }
-
 export interface VersionPreviewData {
   sourceBranch: string;
   targetBranch: string;
@@ -53,14 +47,3 @@ export interface PRWorkflowInfo {
   isDryRun: boolean;
   eventType: string;
 }
-
-// export function isValidReleaseType(type: string): type is ReleaseType {
-//   return ['major', 'minor', 'patch', 'premajor', 'preminor', 'prepatch', 'prerelease'].includes(type);
-// }
-
-// export interface ErrorContext {
-//   operation: string;
-//   branch?: string;
-//   version?: string;
-//   pr?: number;
-// }

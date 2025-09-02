@@ -31,7 +31,7 @@ async function handleExecutionMode(
  * 验证事件类型并提取 PR 信息
  */
 function validateAndExtractPRInfo(): PRWorkflowInfo {
-  if (context.eventName !== 'pull_request') {
+  if (context.eventName !== 'pull_request' && context.eventName !== 'pull_request_target') {
     throw new ActionError(`只支持 pull_request 事件，当前事件: ${context.eventName}`, 'validateEvent');
   }
 

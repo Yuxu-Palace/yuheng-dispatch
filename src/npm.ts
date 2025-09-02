@@ -1,5 +1,6 @@
+import process from 'node:process';
 import { exec } from '@actions/exec';
-import { getInput, logger, setOutput } from './core';
+import { getBooleanInput, getInput, logger, setOutput } from './core';
 import type { SupportedBranch } from './types';
 import { ActionError, cleanVersion } from './utils';
 import { parseVersion } from './version';
@@ -10,8 +11,7 @@ import { parseVersion } from './version';
  * 检查是否启用 npm 发布
  */
 function isNpmPublishEnabled(): boolean {
-  const enablePublish = getInput('enable-npm-publish')?.toLowerCase();
-  return enablePublish === 'true';
+  return getBooleanInput('enable-npm-publish');
 }
 
 /**
@@ -20,7 +20,7 @@ function isNpmPublishEnabled(): boolean {
 function getNpmPublishConfig() {
   const registry = getInput('npm-registry') || 'https://registry.npmjs.org/';
   const token = getInput('npm-token');
-  const tag = getInput('npm-tag') || 'latest';
+  const tag = (getInput('npm-tag') || 'auto').toLowerCase();
   const access = getInput('npm-access') || 'public';
 
   return { registry, token, tag, access };
@@ -38,8 +38,11 @@ async function configureNpmAuth(registry: string, token: string): Promise<void> 
     // 设置认证 token
     if (token) {
       const registryUrl = new URL(registry);
-      const authKey = `//${registryUrl.host}/:_authToken`;
-      await exec('npm', ['config', 'set', authKey, token]);
+      // 确保带上 pathname 且以 / 结尾，兼容带路径的 registry
+      const pathname = registryUrl.pathname.endsWith('/') ? registryUrl.password : `${registryUrl.pathname}/`;
+      const scopedKey = `//${registryUrl.host}${pathname}`;
+      await exec('npm', ['config', 'set', `${scopedKey}:_authToken`, token]);
+      await exec('npm', ['config', 'set', `${scopedKey}:always-auth`, token]);
       logger.info('配置 npm 认证 token');
     }
   } catch (error) {
@@ -52,7 +55,7 @@ async function configureNpmAuth(registry: string, token: string): Promise<void> 
  */
 function determineNpmTag(version: string, targetBranch: SupportedBranch, configTag: string): string {
   // 如果用户指定了特定标签，使用用户指定的标签
-  if (configTag !== 'latest') {
+  if (configTag !== 'auto') {
     return configTag;
   }
 
@@ -116,6 +119,12 @@ async function publishToNpm(
 
     // 执行发布
     await exec('npm', publishArgs);
+    const code = await exec('npm', publishArgs, {
+      env: { ...process.env, NODE_AUTH_TOKEN: config.token || '' },
+    });
+    if (code !== 0) {
+      throw new Error(`npm publish 失败，退出码：${code}`);
+    }
 
     logger.info(`✅ 成功发布到 npm: ${version} (标签: ${publishTag})`);
 
@@ -125,10 +134,12 @@ async function publishToNpm(
     setOutput('npm-registry', config.registry);
   } catch (error) {
     // 检查是否是版本已存在的错误
-    const errorMessage = String(error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
     if (
-      errorMessage.includes('version already exists') ||
-      errorMessage.includes('You cannot publish over the previously published versions')
+      /version already exists/i.test(errorMessage) ||
+      /previously published versions/i.test(errorMessage) ||
+      /EPUBLISHCONFLICT/i.test(errorMessage) ||
+      /\bE403\b/.test(errorMessage)
     ) {
       logger.warning(`版本 ${version} 已存在于 npm registry，跳过发布`);
       return;

@@ -1,4 +1,4 @@
-export { getInput, setFailed, setOutput } from '@actions/core';
+export { getBooleanInput, getInput, setFailed, setOutput } from '@actions/core';
 
 import * as core from '@actions/core';
 

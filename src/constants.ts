@@ -12,10 +12,8 @@ const SUPPORTED_PREFIXES = ['v', 'version-', 'ver-', 'rel-'] as const;
 
 /** 版本前缀配置 */
 export const VERSION_PREFIX_CONFIG = {
-  /** 默认版本前缀 */
-  DEFAULT: 'v',
-  /** 自定义前缀（可通过 action 输入覆盖，如果不支持则使用默认） */
-  CUSTOM: (() => {
+  /** 当前使用的前缀（自动处理用户输入和默认值） */
+  CURRENT: (() => {
     const customPrefix = getInput('version-prefix');
     if (!customPrefix) {
       return 'v';

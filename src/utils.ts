@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import { exec } from '@actions/exec';
-import { SUPPORTED_BRANCHES, VERSION_PREFIX_CONFIG } from './constants';
+import { GIT_USER_CONFIG, SUPPORTED_BRANCHES, VERSION_PREFIX_CONFIG } from './constants';
 import { logger } from './core';
 import type { SupportedBranch } from './types';
 
@@ -38,7 +38,7 @@ export function versionParse(version: string): VersionParseResult {
     return cached;
   }
 
-  const prefix = VERSION_PREFIX_CONFIG.CUSTOM;
+  const prefix = VERSION_PREFIX_CONFIG.CURRENT;
   const supportedPrefixes = VERSION_PREFIX_CONFIG.SUPPORTED;
 
   // 检查是否有当前前缀
@@ -102,7 +102,7 @@ export function clearVersionParseCache(): void {
  * 获取版本前缀
  */
 export function getVersionPrefix(): string {
-  return VERSION_PREFIX_CONFIG.CUSTOM;
+  return VERSION_PREFIX_CONFIG.CURRENT;
 }
 
 /**
@@ -216,9 +216,16 @@ export async function commitAndPushFile(
   targetBranch: SupportedBranch,
 ): Promise<void> {
   try {
+    const changed = await hasFileChanges(filepath);
+    if (!changed) {
+      logger.info(`${filepath} 无变化，跳过提交和推送`);
+      return;
+    }
+    await execGit(['config', 'user.name', GIT_USER_CONFIG.NAME]);
+    await execGit(['config', 'user.email', GIT_USER_CONFIG.EMAIL]);
     await execGit(['add', filepath]);
     await execGit(['commit', '-m', commitMessage]);
-    await execGit(['push', 'origin', targetBranch]);
+    await execGit(['push', 'origin', `HEAD:refs/heads/${targetBranch}`]);
     logger.info(`${filepath} 更新已提交并推送`);
   } catch (error) {
     handleGitError(error, `提交和推送 ${filepath}`, true);

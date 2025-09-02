@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import { exec } from '@actions/exec';
 import { COMMIT_TEMPLATES, LABEL_TO_CHANGELOG_TYPE, PR_SECTION_PATTERNS } from './constants';
-import { getInput, logger } from './core';
+import { getBooleanInput, logger } from './core';
 import type { PRData } from './types';
 import { addVersionPrefix, commitAndPushFile, hasFileChanges } from './utils';
 
@@ -106,9 +106,15 @@ async function generateChangelogFromPR(pr: PRData | null, version: string): Prom
  */
 export async function updateChangelog(pr: PRData | null = null, version = ''): Promise<void> {
   // 检查是否启用 CHANGELOG 生成
-  const enableChangelog = getInput('enable-changelog')?.toLowerCase() !== 'false';
+  const enableChangelog = getBooleanInput('enable-changelog');
   if (!enableChangelog) {
     logger.info('CHANGELOG 生成已禁用，跳过');
+    return;
+  }
+
+  // 校验版本号有效性
+  if (!version || typeof version !== 'string' || version.trim() === '') {
+    logger.warning('版本号为空或无效，跳过 CHANGELOG 生成');
     return;
   }
 
@@ -206,7 +212,7 @@ async function fallbackToConventionalChangelog(): Promise<void> {
 
     // 检查是否已安装，如果未安装则尝试本地安装（不使用-g）
     try {
-      await exec('npx', ['conventional-changelog-cli', '--version'], { silent: true });
+      await exec('npx', ['--no-install', 'conventional-changelog-cli', '--version'], { silent: true });
       logger.info('检测到 conventional-changelog-cli 已安装');
     } catch {
       logger.info('未检测到 conventional-changelog-cli，尝试本地安装...');
@@ -214,7 +220,14 @@ async function fallbackToConventionalChangelog(): Promise<void> {
         // 使用本地安装而不是全局安装，避免权限问题和环境污染
         await exec(
           'npm',
-          ['install', '--no-save', 'conventional-changelog-cli', 'conventional-changelog-conventionalcommits'],
+          [
+            'install',
+            '--no-save',
+            '--no-audit',
+            '--no-fund',
+            'conventional-changelog-cli',
+            'conventional-changelog-conventionalcommits',
+          ],
           {
             silent: true,
           },
@@ -228,7 +241,17 @@ async function fallbackToConventionalChangelog(): Promise<void> {
     // 执行 conventional-changelog，添加静默选项以减少日志噪音
     await exec(
       'npx',
-      ['conventional-changelog-cli', '-p', 'conventionalcommits', '-i', 'CHANGELOG.md', '-s', '-r', '0'],
+      [
+        '--no-install',
+        'conventional-changelog-cli',
+        '-p',
+        'conventionalcommits',
+        '-i',
+        'CHANGELOG.md',
+        '-s',
+        '-r',
+        '0',
+      ],
       { silent: true },
     );
 
