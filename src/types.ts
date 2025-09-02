@@ -42,8 +42,8 @@ export interface PRWorkflowInfo {
   pr: PRData;
   sourceBranch: string;
   targetBranch: SupportedBranch;
-  prNumber: number;
+  prNumber: PRData['number'];
   isMerged: boolean;
   isDryRun: boolean;
-  eventType: string;
+  eventType: 'merge' | 'preview';
 }
