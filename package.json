@@ -1,6 +1,7 @@
 {
   "name": "@yuxu-palace/yuheng-dispatch",
   "version": "0.1.0-alpha.0",
+  "type": "module",
   "description": "A GitHub Action for automatic package version patching with semantic versioning workflow",
   "keywords": [
     "github-action",
