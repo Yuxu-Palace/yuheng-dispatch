@@ -1,7 +1,7 @@
 import { context, getOctokit } from '@actions/github';
 import { COMMENT_CONFIG, COMMENT_TEMPLATES } from './constants';
 import { getInput, logger } from './core';
-import type { PRData, VersionPreviewData } from './types';
+import type { PRData, SupportedBranch, VersionPreviewData } from './types';
 
 // ==================== GitHub API 客户端 ====================
 
@@ -104,7 +104,7 @@ export async function createErrorComment(prNumber: number, errorMessage: string)
 export async function handlePreviewMode(
   pr: PRData | null,
   sourceBranch: string,
-  targetBranch: string,
+  targetBranch: SupportedBranch,
   baseVersion: string | null,
   newVersion: string | null,
 ): Promise<void> {

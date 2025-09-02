@@ -15,7 +15,7 @@ export interface VersionInfo {
 
 export interface VersionPreviewData {
   sourceBranch: string;
-  targetBranch: string;
+  targetBranch: SupportedBranch;
   currentVersion?: string;
   nextVersion: string;
 }
@@ -38,12 +38,14 @@ export interface BranchSyncResult {
   error?: string;
 }
 
+export type PRWorkflowEventType = 'merge' | 'preview';
+
 export interface PRWorkflowInfo {
-  pr: PRData;
-  sourceBranch: string;
-  targetBranch: SupportedBranch;
-  prNumber: PRData['number'];
-  isMerged: boolean;
-  isDryRun: boolean;
-  eventType: 'merge' | 'preview';
+  readonly pr: PRData;
+  readonly sourceBranch: string;
+  readonly targetBranch: SupportedBranch;
+  readonly prNumber: PRData['number'];
+  readonly isMerged: boolean;
+  readonly isDryRun: boolean;
+  readonly eventType: PRWorkflowEventType;
 }
