@@ -58,8 +58,8 @@ async function safePushWithRetry(targetBranch: SupportedBranch, version: string,
       }
 
       // 推送分支和标签
-      await execGit(['push', 'origin', targetBranch]);
-      await execGit(['push', 'origin', version]);
+      await execGit(['push', 'origin', targetBranch, '--force-with-lease']);
+      await execGit(['push', 'origin', version, '--force-with-lease']);
 
       logger.info(`✅ 推送成功 (第${attempt}次尝试)`);
       return;
