@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import { exec } from '@actions/exec';
-import { SUPPORTED_BRANCHES, VERSION_PREFIX_CONFIG } from './constants';
+import { GIT_USER_CONFIG, SUPPORTED_BRANCHES, VERSION_PREFIX_CONFIG } from './constants';
 import { logger } from './core';
 import type { SupportedBranch } from './types';
 
@@ -221,8 +221,8 @@ export async function commitAndPushFile(
       logger.info(`${filepath} 无变化，跳过提交和推送`);
       return;
     }
-    await execGit(['config', 'user.name', 'cmtlyt']);
-    await execGit(['config', 'user.email', 'cmtlyt@163.com']);
+    await execGit(['config', 'user.name', GIT_USER_CONFIG.NAME]);
+    await execGit(['config', 'user.email', GIT_USER_CONFIG.EMAIL]);
     await execGit(['add', filepath]);
     await execGit(['commit', '-m', commitMessage]);
     await execGit(['push', 'origin', `HEAD:refs/heads/${targetBranch}`]);
