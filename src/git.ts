@@ -4,6 +4,7 @@ import { readPackageJSON, resolvePackageJSON, writePackageJSON } from 'pkg-types
 import { commitChangelog, hasChangelogChanges, updateChangelog } from './changelog';
 import { COMMIT_TEMPLATES, ERROR_MESSAGES, GIT_USER_CONFIG } from './constants';
 import { logger } from './core';
+import { handleNpmPublish } from './npm';
 import type { BranchSyncResult, PRData, SupportedBranch } from './types';
 import { ActionError, execGit, versionParse } from './utils';
 import { updatePackageVersion } from './version';
@@ -400,7 +401,6 @@ export async function updateVersionAndCreateTag(
     }
 
     // 🚀 发布到 npm - 只对目标分支版本发布
-    const { handleNpmPublish } = await import('./npm');
     await handleNpmPublish(newVersion, targetBranch);
   } catch (error) {
     throw new ActionError(`版本更新和标签创建失败: ${error}`, 'updateVersionAndCreateTag', error);

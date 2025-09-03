@@ -49,7 +49,7 @@ function validateAndExtractPRInfo(): PRWorkflowInfo {
     throw new ActionError(`不支持的分支: ${targetBranch}，跳过版本管理`, 'validateBranch');
   }
 
-  const pr: PRData = prPayload as PRData;
+  const pr = prPayload as PRData;
   const isMerged = prPayload.state === 'closed' && prPayload.merged === true;
   const isDryRun = !isMerged;
   const eventType = isMerged ? 'merge' : 'preview';

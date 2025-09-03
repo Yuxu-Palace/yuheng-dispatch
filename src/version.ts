@@ -175,9 +175,23 @@ class VersionManager {
   private cache: VersionCache = {};
   private isInitialized = false;
 
-  /**
-   * 初始化版本缓存 - 一次性获取所有版本信息
-   */
+  private async getAllTags(): Promise<string[]> {
+    const prefix = getVersionPrefix();
+    // 使用 --sort=-creatordate 按创建时间倒序排列，最新的 tag 在前面
+    const stdout = await execGitWithOutput(['tag', '-l', `${prefix}*`, '--sort=-creatordate']);
+    return stdout.split('\n').filter((tag) => tag.trim().length > 0);
+  }
+
+  private parseMainVersion(tags: string[]): string | null {
+    const latest = tags.find((tag) => !tag.includes('-')) || null;
+    return latest ? normalizeVersion(latest) : null;
+  }
+
+  private parseBranchVersion(tags: string[], branchSuffix: string): string | null {
+    const latest = tags.find((tag) => tag.includes(`-${branchSuffix}.`)) || null;
+    return latest ? normalizeVersion(latest) : null;
+  }
+
   async initialize(): Promise<void> {
     if (this.isInitialized) {
       return;
@@ -206,43 +220,11 @@ class VersionManager {
     this.isInitialized = true;
   }
 
-  /**
-   * 一次性获取所有版本标签（按时间倒序排列）
-   */
-  private async getAllTags(): Promise<string[]> {
-    const prefix = getVersionPrefix();
-    // 使用 --sort=-creatordate 按创建时间倒序排列，最新的 tag 在前面
-    const stdout = await execGitWithOutput(['tag', '-l', `${prefix}*`, '--sort=-creatordate']);
-    return stdout.split('\n').filter((tag) => tag.trim().length > 0);
-  }
-
-  /**
-   * 解析主分支版本（排除预发布版本）
-   */
-  private parseMainVersion(tags: string[]): string | null {
-    const latest = tags.find((tag) => !tag.includes('-')) || null;
-    return latest ? normalizeVersion(latest) : null;
-  }
-
-  /**
-   * 解析 beta/alpha 分支版本
-   */
-  private parseBranchVersion(tags: string[], branchSuffix: string): string | null {
-    const latest = tags.find((tag) => tag.includes(`-${branchSuffix}.`)) || null;
-    return latest ? normalizeVersion(latest) : null;
-  }
-
-  /**
-   * 获取指定分支的最新版本
-   */
   async getLatestVersion(branch: 'main' | 'beta' | 'alpha'): Promise<string | null> {
     await this.initialize();
     return this.cache[branch] || null;
   }
 
-  /**
-   * 获取全局最高基础版本
-   */
   async getGlobalHighestVersion(): Promise<string> {
     await this.initialize();
 
@@ -269,17 +251,11 @@ class VersionManager {
     return result;
   }
 
-  /**
-   * 获取最新的 tag（按创建时间）
-   */
   async getLatestTag(): Promise<string | null> {
     const allTags = await this.getAllTags();
     return allTags.length > 0 ? allTags[0] : null;
   }
 
-  /**
-   * 检查 tag 的类型
-   */
   getTagType(tag: string): 'release' | 'beta' | 'alpha' | 'unknown' {
     if (!tag) {
       return 'unknown';
@@ -297,9 +273,6 @@ class VersionManager {
     return 'unknown';
   }
 
-  /**
-   * 清除缓存（用于测试或重新初始化）
-   */
   clearCache(): void {
     this.cache = {};
     this.isInitialized = false;
@@ -406,30 +379,7 @@ function createUpgradeContext(
  * Alpha 分支策略 - 基于 PR 标签处理
  */
 class AlphaStrategy implements VersionUpgradeStrategy {
-  canHandle(context: VersionUpgradeContext): boolean {
-    return context.targetBranch === 'alpha';
-  }
-
-  async execute(context: VersionUpgradeContext): Promise<string | null> {
-    const { pr } = context;
-
-    // 检查 PR 标签
-    if (!pr?.labels || pr.labels.length === 0) {
-      logger.info('📛 Alpha 分支无 PR 标签，跳过版本升级');
-      return null;
-    }
-
-    // 从 PR 标签获取发布类型
-    const releaseType = getReleaseTypeFromLabels(pr.labels);
-    if (!releaseType) {
-      const allLabelNames = pr.labels.map((label) => label.name).join(', ');
-      logger.info(`📝 PR #${pr.number} 有标签但无版本标签: [${allLabelNames}]，跳过版本升级`);
-      return null;
-    }
-
-    logger.info(`✅ 使用 PR 标签: ${releaseType} (来源: PR #${pr.number})`);
-    return await this.calculateAlphaVersion(context, releaseType);
-  }
+  description = 'Alpha 分支基于 PR 标签处理版本升级';
 
   private async calculateAlphaVersion(context: VersionUpgradeContext, releaseType: ReleaseType): Promise<string> {
     const { baseVersion } = context;
@@ -488,13 +438,38 @@ class AlphaStrategy implements VersionUpgradeStrategy {
     return incrementedVersion || currentAlphaVersion;
   }
 
-  description = 'Alpha 分支基于 PR 标签处理版本升级';
+  canHandle(context: VersionUpgradeContext): boolean {
+    return context.targetBranch === 'alpha';
+  }
+
+  async execute(context: VersionUpgradeContext): Promise<string | null> {
+    const { pr } = context;
+
+    // 检查 PR 标签
+    if (!pr?.labels || pr.labels.length === 0) {
+      logger.info('📛 Alpha 分支无 PR 标签，跳过版本升级');
+      return null;
+    }
+
+    // 从 PR 标签获取发布类型
+    const releaseType = getReleaseTypeFromLabels(pr.labels);
+    if (!releaseType) {
+      const allLabelNames = pr.labels.map((label) => label.name).join(', ');
+      logger.info(`📝 PR #${pr.number} 有标签但无版本标签: [${allLabelNames}]，跳过版本升级`);
+      return null;
+    }
+
+    logger.info(`✅ 使用 PR 标签: ${releaseType} (来源: PR #${pr.number})`);
+    return await this.calculateAlphaVersion(context, releaseType);
+  }
 }
 
 /**
  * Beta 分支策略 - 基于源分支判断处理方式
  */
 class BetaStrategy implements VersionUpgradeStrategy {
+  description = 'Beta 分支基于源分支类型处理版本升级';
+
   canHandle(context: VersionUpgradeContext): boolean {
     return context.targetBranch === 'beta';
   }
@@ -514,14 +489,14 @@ class BetaStrategy implements VersionUpgradeStrategy {
     logger.info(`🔄 递增 Beta 测试号: ${baseVersion} -> ${incrementedVersion} (源分支: ${sourceBranch})`);
     return incrementedVersion || baseVersion;
   }
-
-  description = 'Beta 分支基于源分支类型处理版本升级';
 }
 
 /**
  * Main 分支策略 - 只接受 Beta 分支来源
  */
 class MainStrategy implements VersionUpgradeStrategy {
+  description = 'Main 分支只接受 Beta 来源，转换为正式版本';
+
   canHandle(context: VersionUpgradeContext): boolean {
     return context.targetBranch === 'main';
   }
@@ -535,8 +510,6 @@ class MainStrategy implements VersionUpgradeStrategy {
     logger.info(`🚀 从 Beta 转换为正式版: ${baseVersion} -> ${betaBaseVersion}`);
     return betaBaseVersion;
   }
-
-  description = 'Main 分支只接受 Beta 来源，转换为正式版本';
 }
 
 /**

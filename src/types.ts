@@ -38,6 +38,7 @@ export interface BranchSyncResult {
   error?: string;
 }
 
+/** 工作流内部事件枚举（非 GitHub Webhook 事件名） */
 export type PRWorkflowEventType = 'merge' | 'preview';
 
 export interface PRWorkflowInfo {
