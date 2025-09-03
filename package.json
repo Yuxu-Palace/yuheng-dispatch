@@ -27,7 +27,7 @@
     "format": "biome format --write",
     "prepare": "husky",
     "buildAndCommit": "pnpm build && git add -A dist/",
-    "prepublishOnly": "echo \"Error, Check the error log.\" | exit 1"
+    "prepublishOnly": "echo \"Error, Do not publish as npm package\" | exit 1"
   },
   "devDependencies": {
     "@biomejs/biome": "2.2.2",
