@@ -21,18 +21,13 @@
     "url": "https://github.com/Yuxu-Palace/yuheng-dispatch/issues"
   },
   "main": "./dist/index.cjs",
-  "files": [
-    "dist",
-    "action.yaml",
-    "README.md",
-    "CHANGELOG.md"
-  ],
   "scripts": {
     "build": "tsup",
     "check": "biome check --write",
     "format": "biome format --write",
     "prepare": "husky",
-    "buildAndCommit": "pnpm build && git add -A dist/"
+    "buildAndCommit": "pnpm build && git add -A dist/",
+    "prepublishOnly": "echo \"Error, Check the error log.\" | exit 1"
   },
   "devDependencies": {
     "@biomejs/biome": "2.2.2",
