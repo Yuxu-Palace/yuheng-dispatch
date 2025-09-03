@@ -19,12 +19,12 @@ inputs:
   git-user-name:
     description: Git user name for commits
     required: false
-    default: 'GitHub Action'
+    default: 'cmtlyt'
   
   git-user-email:
     description: Git user email for commits
     required: false
-    default: 'action@github.com'
+    default: 'cmtlyt@163.com'
   
   supported-branches:
     description: Comma-separated list of supported branches
