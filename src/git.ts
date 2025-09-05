@@ -33,6 +33,10 @@ export async function commitVersionForMerge(
 
     logger.info(`🔄 为 PR #${pr?.number || 'N/A'} 准备版本更改...`);
 
+    // 确保在目标分支上进行操作
+    await execGit(['switch', targetBranch]);
+    logger.info(`已切换到 ${targetBranch} 分支`);
+
     // 更新包版本
     await updatePackageVersion(version);
 
@@ -48,16 +52,21 @@ export async function commitVersionForMerge(
     // 添加所有变更到暂存区
     await execGit(['add', '.']);
 
-    // 创建提交（这个提交将包含在 PR merge 中，无需后续推送）
+    // 创建提交
     const commitMessage = `${COMMIT_TEMPLATES.VERSION_BUMP(packageVersion, targetBranch)}\n\n🤖 包含版本升级和 CHANGELOG 更新 (PR #${pr?.number || 'N/A'})`;
     await execGit(['commit', '-m', commitMessage]);
 
-    logger.info(`✅ 版本更改已提交，将随 PR #${pr?.number || 'N/A'} 一起合并到 ${targetBranch}`);
+    logger.info(`✅ 版本更改已提交到 ${targetBranch} 分支`);
+
+    // 推送更改到远程分支
+    await execGit(['push', 'origin', targetBranch]);
+    logger.info(`✅ 更改已推送到远程 ${targetBranch} 分支`);
+
     logger.info(`🏷️ 标签: ${fullVersion}`);
 
-    // 创建版本标签（但是不推送）
+    // 创建版本标签
     await execGit(['tag', fullVersion]);
-    logger.info(`✅ 标签已创建本地: ${fullVersion}`);
+    logger.info(`✅ 标签已创建: ${fullVersion}`);
   } catch (error) {
     const message = `为 PR merge 提交版本更改: ${error}`;
     logger.error(message);
@@ -66,7 +75,7 @@ export async function commitVersionForMerge(
 }
 
 /**
- * 只推送标签（用于 PR merge 后的发布流程）
+ * 只推送标签（版本提交已在 commitVersionForMerge 中完成）
  */
 export async function pushTagsOnly(version: string, targetBranch: SupportedBranch): Promise<void> {
   try {
@@ -77,7 +86,7 @@ export async function pushTagsOnly(version: string, targetBranch: SupportedBranc
     // 确保在正确的分支上
     await execGit(['switch', targetBranch]);
 
-    // 只推送标签，不推送文件变更（因为文件已在 PR merge 时包含）
+    // 推送标签到远程仓库
     await execGit(['push', 'origin', fullVersion]);
 
     logger.info(`✅ 标签推送成功: ${fullVersion}`);
