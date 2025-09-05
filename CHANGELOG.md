@@ -1,3 +1,9 @@
+## [v0.1.0-alpha.4] - 2025-09-05
+
+### 🐛 Bug Fixes
+- fix: new empty fix ([#12](https://github.com/Yuxu-Palace/yuheng-dispatch/pull/12))
+
+
 ## [v0.1.0-alpha.2] - 2025-09-03
 
 ### 🐛 Bug Fixes
