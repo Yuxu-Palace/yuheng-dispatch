@@ -1,3 +1,9 @@
+## [v0.1.0-alpha.3] - 2025-09-05
+
+### 🐛 Bug Fixes
+- Style/code ([#10](https://github.com/Yuxu-Palace/yuheng-dispatch/pull/10))
+
+
 ## [v0.1.0-alpha.2] - 2025-09-03
 
 ### 🐛 Bug Fixes
