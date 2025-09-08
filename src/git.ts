@@ -21,87 +21,7 @@ export async function configureGitUser(): Promise<void> {
 }
 
 /**
- * 在 PR merge 阶段提交版本更改（不推送，因为变更已包含在 merge 中）
- */
-export async function commitVersionForMerge(
-  version: string,
-  targetBranch: SupportedBranch,
-  pr: PRData | null = null,
-): Promise<void> {
-  try {
-    const { pkgVersion: packageVersion, targetVersion: fullVersion } = versionParse(version);
-
-    logger.info(`🔄 为 PR #${pr?.number || 'N/A'} 准备版本更改...`);
-
-    // 确保在目标分支上进行操作
-    await execGit(['switch', targetBranch]);
-    logger.info(`已切换到 ${targetBranch} 分支`);
-
-    // 更新包版本
-    await updatePackageVersion(version);
-
-    // 生成 changelog（使用 PR 信息）
-    await updateChangelog(pr, version);
-
-    // 检查是否有 changelog 变更
-    const hasChanges = await hasChangelogChanges();
-    if (!hasChanges) {
-      logger.warning('⚠️ CHANGELOG 未生成任何内容，这将跳过 changelog 更新');
-    }
-
-    // 添加所有变更到暂存区
-    await execGit(['add', '.']);
-
-    // 创建提交
-    const commitMessage = `${COMMIT_TEMPLATES.VERSION_BUMP(packageVersion, targetBranch)}\n\n🤖 包含版本升级和 CHANGELOG 更新 (PR #${pr?.number || 'N/A'})`;
-    await execGit(['commit', '-m', commitMessage]);
-
-    logger.info(`✅ 版本更改已提交到 ${targetBranch} 分支`);
-
-    // 推送更改到远程分支
-    await execGit(['push', 'origin', targetBranch]);
-    logger.info(`✅ 更改已推送到远程 ${targetBranch} 分支`);
-
-    logger.info(`🏷️ 标签: ${fullVersion}`);
-
-    // 创建版本标签
-    await execGit(['tag', fullVersion]);
-    logger.info(`✅ 标签已创建: ${fullVersion}`);
-  } catch (error) {
-    const message = `为 PR merge 提交版本更改: ${error}`;
-    logger.error(message);
-    throw new ActionError(message, 'commitVersionForMerge', error);
-  }
-}
-
-/**
- * 只推送标签（版本提交已在 commitVersionForMerge 中完成）
- */
-export async function pushTagsOnly(version: string, targetBranch: SupportedBranch): Promise<void> {
-  try {
-    const { targetVersion: fullVersion } = versionParse(version);
-
-    logger.info(`🚀 推送标签到远程仓库: ${fullVersion}`);
-
-    // 确保在正确的分支上
-    await execGit(['switch', targetBranch]);
-
-    // 推送标签到远程仓库
-    await execGit(['push', 'origin', fullVersion]);
-
-    logger.info(`✅ 标签推送成功: ${fullVersion}`);
-
-    // NPM 发布（如果有配置）
-    await handleNpmPublish(version, targetBranch);
-  } catch (error) {
-    const message = `推送标签: ${error}`;
-    logger.error(message);
-    throw new ActionError(message, 'pushTagsOnly', error);
-  }
-}
-
-/**
- * 提交并推送版本更改（保留原有的向后兼容）
+ * 提交并推送版本更改
  */
 export async function commitAndPushVersion(version: string, targetBranch: SupportedBranch): Promise<void> {
   try {
@@ -125,102 +45,38 @@ export async function commitAndPushVersion(version: string, targetBranch: Suppor
 }
 
 /**
- * 安全推送，处理并发冲突和分支保护
+ * 安全推送，处理并发冲突
  */
 async function safePushWithRetry(targetBranch: SupportedBranch, version: string, maxRetries = 3): Promise<void> {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      await attemptPush(attempt, maxRetries, targetBranch, version);
+      if (attempt > 1) {
+        logger.info(`🔄 尝试推送 (第${attempt}/${maxRetries}次)`);
+        // 拉取最新更改
+        await execGit(['fetch', 'origin', targetBranch]);
+        await execGit(['rebase', `origin/${targetBranch}`]);
+      }
+
+      // 推送分支和标签
+      await execGit(['push', 'origin', targetBranch]);
+      await execGit(['push', 'origin', version]);
+
       logger.info(`✅ 推送成功 (第${attempt}次尝试)`);
       return;
     } catch (error) {
-      await handlePushAttemptError(error, attempt, maxRetries, targetBranch, version);
+      if (attempt === maxRetries) {
+        logger.error(`❌ 推送失败，已尝试${maxRetries}次: ${error}`);
+        throw error;
+      }
+
+      logger.warning(`⚠️ 推送失败 (第${attempt}/${maxRetries}次)，可能存在并发冲突: ${error}`);
+
+      // 等待随机时间避免竞态
+      const delay = Math.random() * 2000 + 1000; // 1-3秒随机延迟
+      logger.info(`⏳ 等待 ${Math.round(delay)}ms 后重试...`);
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
-}
-
-/**
- * 执行单次推送尝试
- */
-async function attemptPush(
-  attempt: number,
-  maxRetries: number,
-  targetBranch: SupportedBranch,
-  version: string,
-): Promise<void> {
-  if (attempt > 1) {
-    logger.info(`🔄 尝试推送 (第${attempt}/${maxRetries}次)`);
-    await prepareForRetry(targetBranch);
-  }
-
-  // 推送分支和标签 - 使用 --force-with-lease 处理分支保护
-  logger.info('📤 推送分支...');
-  await execGit(['push', 'origin', targetBranch, '--force-with-lease']);
-  logger.info('🏷️ 推送标签...');
-  await execGit(['push', 'origin', version]);
-}
-
-/**
- * 为重试准备：拉取最新更改并解决冲突
- */
-async function prepareForRetry(targetBranch: SupportedBranch): Promise<void> {
-  // 拉取最新更改
-  await execGit(['fetch', 'origin', targetBranch]);
-  await execGit(['rebase', `origin/${targetBranch}`]);
-}
-
-/**
- * 处理推送尝试中的错误
- */
-async function handlePushAttemptError(
-  error: unknown,
-  attempt: number,
-  maxRetries: number,
-  targetBranch: SupportedBranch,
-  version: string,
-): Promise<void> {
-  const errorMessage = error instanceof Error ? error.message : String(error);
-
-  if (attempt === maxRetries) {
-    await logFinalPushFailure(targetBranch, version, errorMessage);
-    throw error;
-  }
-
-  logger.warning(`⚠️ 推送失败 (第${attempt}/${maxRetries}次)，可能存在并发冲突: ${errorMessage}`);
-  await waitForRetry();
-}
-
-/**
- * 记录最终推送失败的详细信息
- */
-async function logFinalPushFailure(
-  targetBranch: SupportedBranch,
-  version: string,
-  errorMessage: string,
-): Promise<void> {
-  logger.error(`❌ 推送失败，已尝试3次: ${errorMessage}`);
-
-  // 提供诊断信息
-  logger.info('🔍 推送失败诊断：');
-  logger.info(`- 分支: ${targetBranch}`);
-  logger.info(`- 标签: ${version}`);
-
-  if (errorMessage.includes('protected')) {
-    logger.error('🚨 分支保护问题：请确认 GitHub Actions 有推送权限');
-  }
-  if (errorMessage.includes('force-with-lease')) {
-    logger.error('🚨 强制推送被拒绝：可能存在远程更改冲突');
-  }
-}
-
-/**
- * 等待随机时间后重试
- */
-async function waitForRetry(): Promise<void> {
-  // 等待随机时间避免竞态
-  const delay = Math.random() * 2000 + 1000; // 1-3秒随机延迟
-  logger.info(`⏳ 等待 ${Math.round(delay)}ms 后重试...`);
-  await new Promise((resolve) => setTimeout(resolve, delay));
 }
 
 // ==================== 分支同步逻辑 ====================
@@ -510,32 +366,7 @@ export async function syncBranches(targetBranch: SupportedBranch, newVersion: st
   return results;
 }
 
-/**
- * 只创建标签（不更新版本文件）- 用于新的合并策略
- */
-export async function createTagOnly(version: string, targetBranch: SupportedBranch): Promise<void> {
-  try {
-    logger.info('开始创建版本标签...');
-
-    const { targetVersion: fullVersion } = versionParse(version);
-
-    // 确保在正确的分支上
-    await execGit(['switch', targetBranch]);
-
-    // 创建版本标签
-    await execGit(['tag', fullVersion]);
-    logger.info(`已创建标签: ${fullVersion}`);
-
-    // 推送标签到远程
-    await execGit(['push', 'origin', fullVersion]);
-    logger.info(`✅ 标签 ${fullVersion} 推送成功`);
-
-    // 🚀 发布到 npm - 只对目标分支版本发布
-    await handleNpmPublish(version, targetBranch);
-  } catch (error) {
-    throw new ActionError(`创建标签失败: ${error}`, 'createTagOnly', error);
-  }
-}
+// ==================== 版本更新和标签创建 ====================
 
 /**
  * 更新版本并创建标签 - 支持基于 PR 的 CHANGELOG 生成和 npm 发布

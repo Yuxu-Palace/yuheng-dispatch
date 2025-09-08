@@ -1,7 +1,7 @@
 import process from 'node:process';
 import { context } from '@actions/github';
 import { logger, setFailed, setOutput } from './core';
-import { commitVersionForMerge, configureGitUser, pushTagsOnly, syncBranches } from './git';
+import { configureGitUser, syncBranches, updateVersionAndCreateTag } from './git';
 import { createErrorComment, getCurrentPRNumber, handlePreviewMode } from './pr';
 import type { PRData, PRWorkflowInfo, SupportedBranch } from './types';
 import { ActionError, isSupportedBranch } from './utils';
@@ -17,25 +17,13 @@ async function handleExecutionMode(
   targetBranch: SupportedBranch,
   pr: PRData | null,
 ): Promise<void> {
-  try {
-    // 第一步：在 PR merge 阶段提交版本更改（包含版本和 changelog）
-    await commitVersionForMerge(newVersion, targetBranch, pr);
+  await updateVersionAndCreateTag(newVersion, targetBranch, pr);
+  const syncResults = await syncBranches(targetBranch, newVersion);
 
-    // 第二步：推送标签（post-merge 阶段）
-    await pushTagsOnly(newVersion, targetBranch);
-
-    // 第三步：分支同步
-    const syncResults = await syncBranches(targetBranch, newVersion);
-
-    // 检查同步结果
-    const failedSyncs = syncResults.filter((result) => !result.success);
-    if (failedSyncs.length > 0) {
-      logger.warning(`部分分支同步失败: ${failedSyncs.map((result) => result.error).join(', ')}`);
-    }
-  } catch (error) {
-    const message = `版本更新流程失败: ${error instanceof Error ? error.message : String(error)}`;
-    logger.error(message);
-    throw new ActionError(message, 'handleExecutionMode', error);
+  // 检查同步结果
+  const failedSyncs = syncResults.filter((result) => !result.success);
+  if (failedSyncs.length > 0) {
+    logger.warning(`部分分支同步失败: ${failedSyncs.map((result) => result.error).join(', ')}`);
   }
 }
 
@@ -138,20 +126,20 @@ async function executeWorkflow(
   newVersion: string | null,
 ): Promise<void> {
   if (info.isDryRun) {
-    // 预览模式：只做版本号推断和 PR 评论更新，不做任何文件修改
+    // 预览模式：更新 PR 评论
     logger.info('📝 执行预览模式...');
     await handlePreviewMode(info.pr, info.sourceBranch, info.targetBranch, baseVersion, newVersion);
     setOutput('preview-version', newVersion || '');
     setOutput('is-preview', 'true');
   } else {
-    // 执行模式：PR 合并后进行完整的版本发布流程
-    logger.info('🚀 执行版本发布模式...');
+    // 执行模式：无论是否有新版本都要处理
+    logger.info('🚀 执行版本更新模式...');
 
     if (newVersion) {
-      // 有新版本：执行完整的版本更新和发布流程
+      // 有新版本：更新版本并同步分支 - 传递 PR 信息给 CHANGELOG 生成
       await handleExecutionMode(newVersion, info.targetBranch, info.pr);
       setOutput('next-version', newVersion);
-      logger.info(`✅ 版本发布完成: ${newVersion}`);
+      logger.info(`✅ 版本更新完成: ${newVersion}`);
     } else {
       // 无新版本：记录详细信息但不阻塞流程
       logger.info(
