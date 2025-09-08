@@ -1,3 +1,9 @@
+## [v0.1.0-beta.0] - 2025-09-08
+
+### 📝 Changes
+- Alpha ([#11](https://github.com/Yuxu-Palace/yuheng-dispatch/pull/11))
+
+
 ## [v0.1.0-alpha.1] - 2025-09-03
 
 ### 🐛 Bug Fixes
