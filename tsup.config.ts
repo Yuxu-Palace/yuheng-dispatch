@@ -8,5 +8,6 @@ export default defineConfig({
   format: ['cjs'],
   outExtension: ({ format }) => ({ js: format === 'cjs' ? '.cjs' : '.js' }),
   clean: true,
+  minify: true,
   noExternal: [...Object.keys(dependencies)],
 });
