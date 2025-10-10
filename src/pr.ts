@@ -1,7 +1,7 @@
 import { context, getOctokit } from '@actions/github';
 import { COMMENT_CONFIG, COMMENT_TEMPLATES } from './constants';
 import { getInput, logger } from './core';
-import type { PRData, SupportedBranch, VersionPreviewData } from './types';
+import type { IssueComment, PRData, SupportedBranch, VersionPreviewData } from './types';
 
 // ==================== GitHub API 客户端 ====================
 
@@ -19,27 +19,6 @@ export function getCurrentPRNumber(pr: PRData | null): number | null {
 
 // ==================== PR 信息获取 ====================
 
-// /**
-//  * 获取当前 Pull Request 信息
-//  */
-// export async function getCurrentPR(): Promise<PRData | null> {
-//   if (!context.payload.pull_request) {
-//     return null;
-//   }
-
-//   try {
-//     const { data: pr } = await octokit.rest.pulls.get({
-//       owner: context.repo.owner,
-//       repo: context.repo.repo,
-//       pull_number: context.payload.pull_request.number,
-//     });
-//     return pr;
-//   } catch (error) {
-//     logger.warning(`获取当前 PR 失败: ${error}`);
-//     return null;
-//   }
-// }
-
 // ==================== PR 评论管理 ====================
 
 /**
@@ -51,7 +30,6 @@ export async function updatePRComment(
   identifier = `## ${COMMENT_CONFIG.TITLE}`,
 ): Promise<void> {
   try {
-    type IssueComment = Awaited<ReturnType<typeof octokit.rest.issues.listComments>>['data'][number];
     let existingComment: IssueComment | undefined;
 
     for await (const { data: comments } of octokit.paginate.iterator(octokit.rest.issues.listComments, {
@@ -138,31 +116,3 @@ export async function handlePreviewMode(
   await updatePRComment(prNumber, commentBody);
   logger.info(`已更新 PR #${prNumber} 的版本预览信息`);
 }
-
-// /**
-//  * 严格策略：确定版本升级类型 - 只基于 PR 标签，无智能推断
-//  * 要求：必须有明确的版本标签（major/minor/patch）才进行版本升级
-//  */
-// export async function determineReleaseType(pr: PRData | null, targetBranch: string): Promise<ReleaseType | ''> {
-//   logger.info(`🔍 开始确定版本升级类型 (PR: ${pr ? `#${pr.number}` : '无'}, 分支: ${targetBranch})`);
-
-//   // 🎯 严格要求：只基于 PR 标签进行版本升级
-//   if (pr?.labels && pr.labels.length > 0) {
-//     const labelReleaseType = getReleaseTypeFromLabels(pr.labels);
-//     if (labelReleaseType) {
-//       logger.info(`✅ 使用 PR 标签: ${labelReleaseType} (来源: PR #${pr.number})`);
-//       return labelReleaseType;
-//     } else {
-//       const labelNames = pr.labels.map((l) => l.name).join(', ');
-//       logger.info(`📝 PR #${pr.number} 有标签但无版本标签: [${labelNames}]，跳过版本升级`);
-//     }
-//   } else if (pr) {
-//     logger.info(`📝 PR #${pr.number} 没有标签，跳过版本升级`);
-//   } else {
-//     logger.info(`📝 无 PR 信息，跳过版本升级`);
-//   }
-
-//   // 🚫 移除智能推断：严格要求明确的版本标签
-//   logger.info(`❌ 未检测到明确的版本标签 (major/minor/patch)，跳过版本升级`);
-//   return '';
-// }
