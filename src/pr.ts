@@ -51,16 +51,23 @@ export async function updatePRComment(
   identifier = `## ${COMMENT_CONFIG.TITLE}`,
 ): Promise<void> {
   try {
-    const { data: comments } = await octokit.rest.issues.listComments({
+    type IssueComment = Awaited<ReturnType<typeof octokit.rest.issues.listComments>>['data'][number];
+    let existingComment: IssueComment | undefined;
+
+    for await (const { data: comments } of octokit.paginate.iterator(octokit.rest.issues.listComments, {
       owner: context.repo.owner,
       repo: context.repo.repo,
       // biome-ignore lint/style/useNamingConvention: GitHub API requires this property name
       issue_number: prNumber,
-    });
+      // biome-ignore lint/style/useNamingConvention: GitHub API requires this property name
+      per_page: 100,
+    })) {
+      existingComment = comments.find((comment) => comment.user?.type === 'Bot' && comment.body?.includes(identifier));
 
-    const existingComment = comments.find(
-      (comment) => comment.user?.type === 'Bot' && comment.body?.includes(identifier),
-    );
+      if (existingComment) {
+        break;
+      }
+    }
 
     if (existingComment) {
       await octokit.rest.issues.updateComment({
