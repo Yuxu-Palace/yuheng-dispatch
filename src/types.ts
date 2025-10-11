@@ -6,6 +6,10 @@ export type SupportedBranch = 'main' | 'beta' | 'alpha';
 
 export type PRData = Awaited<ReturnType<ReturnType<typeof getOctokit>['rest']['pulls']['get']>>['data'];
 
+export type IssueComment = Awaited<
+  ReturnType<ReturnType<typeof getOctokit>['rest']['issues']['listComments']>
+>['data'][number];
+
 export interface VersionInfo {
   current: string;
   beta: string;
