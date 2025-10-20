@@ -39,10 +39,10 @@ async function configureNpmAuth(registry: string, token: string): Promise<void> 
     if (token) {
       const registryUrl = new URL(registry);
       // 确保带上 pathname 且以 / 结尾，兼容带路径的 registry
-      const pathname = registryUrl.pathname.endsWith('/') ? registryUrl.password : `${registryUrl.pathname}/`;
+      const pathname = registryUrl.pathname.endsWith('/') ? registryUrl.pathname : `${registryUrl.pathname}/`;
       const scopedKey = `//${registryUrl.host}${pathname}`;
       await exec('npm', ['config', 'set', `${scopedKey}:_authToken`, token]);
-      await exec('npm', ['config', 'set', `${scopedKey}:always-auth`, token]);
+      await exec('npm', ['config', 'set', `${scopedKey}:always-auth`, 'true']);
       logger.info('配置 npm 认证 token');
     }
   } catch (error) {
