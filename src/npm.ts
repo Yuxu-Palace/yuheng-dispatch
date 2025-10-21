@@ -38,10 +38,9 @@ async function configureNpmAuth(registry: string, token: string): Promise<void> 
       const majorPart = Number.parseInt(version.split('.')[0] ?? '', 10);
       if (!Number.isNaN(majorPart)) {
         npmMajorVersion = majorPart;
-        logger.debug(`检测到 npm 版本: ${version}`);
       }
     } catch (detectError) {
-      logger.warning(`无法检测 npm 版本: ${detectError}`);
+      logger.debug(`跳过 npm 版本检测: ${detectError}`);
     }
 
     // 设置 registry
@@ -63,7 +62,7 @@ async function configureNpmAuth(registry: string, token: string): Promise<void> 
           logger.warning(`配置 always-auth 失败，已忽略: ${alwaysAuthError}`);
         }
       } else {
-        logger.info('检测到 npm >= 10，无需配置 always-auth');
+        logger.debug('检测到 npm >= 10，无需配置 always-auth');
       }
       logger.info('配置 npm 认证 token');
     }
