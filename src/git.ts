@@ -4,9 +4,9 @@ import { readPackageJSON, resolvePackageJSON, writePackageJSON } from 'pkg-types
 import { commitChangelog, hasChangelogChanges, updateChangelog } from './changelog';
 import { COMMIT_TEMPLATES, ERROR_MESSAGES, GIT_USER_CONFIG } from './constants';
 import { logger } from './core';
-import { handleNpmPublish } from './npm';
+import { handleNpmPublish, verifyNpmPublishConfig } from './npm';
 import type { BranchSyncResult, PRData, SupportedBranch } from './types';
-import { ActionError, execGit, execGitWithOutput, versionParse } from './utils';
+import { ActionError, execGit, versionParse } from './utils';
 import { updatePackageVersion } from './version';
 
 // ==================== Git 基础操作 ====================
@@ -77,56 +77,6 @@ async function safePushWithRetry(targetBranch: SupportedBranch, version: string,
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
-}
-
-async function deleteTagSafely(tag: string): Promise<void> {
-  let localDeleted = false;
-
-  try {
-    await execGit(['tag', '-d', tag]);
-    logger.info(`已删除本地标签: ${tag}`);
-    localDeleted = true;
-  } catch (error) {
-    logger.warning(`删除本地标签 ${tag} 失败或不存在: ${error}`);
-  }
-
-  try {
-    await execGit(['push', 'origin', `:refs/tags/${tag}`]);
-    logger.info(`已删除远程标签: ${tag}`);
-  } catch (error) {
-    const message = `删除远程标签 ${tag} 失败: ${error}`;
-    if (localDeleted) {
-      logger.error(message);
-    } else {
-      logger.warning(message);
-    }
-    throw new ActionError(message, 'deleteTagSafely', error);
-  }
-}
-
-async function cleanupTagAfterFailure(tag: string): Promise<void> {
-  try {
-    logger.warning(`npm 发布失败，开始清理标签 ${tag}`);
-    await deleteTagSafely(tag);
-    logger.info(`已清理失败发布产生的标签: ${tag}`);
-  } catch (error) {
-    throw new ActionError(`清理标签 ${tag} 失败: ${error}`, 'cleanupTagAfterFailure', error);
-  }
-}
-
-async function restoreBranchToSha(branch: SupportedBranch, sha: string): Promise<void> {
-  try {
-    await execGit(['reset', '--hard', sha]);
-    await execGit(['push', '--force-with-lease', 'origin', branch]);
-    logger.info(`已将分支 ${branch} 恢复到 ${sha}`);
-  } catch (error) {
-    throw new ActionError(`恢复分支 ${branch} 到 ${sha} 失败: ${error}`, 'restoreBranchToSha', error);
-  }
-}
-
-async function cleanupAfterPublishFailure(tag: string, branch: SupportedBranch, originalSha: string): Promise<void> {
-  await cleanupTagAfterFailure(tag);
-  await restoreBranchToSha(branch, originalSha);
 }
 
 // ==================== 分支同步逻辑 ====================
@@ -430,12 +380,14 @@ export async function updateVersionAndCreateTag(
     logger.info('开始执行版本更新...');
 
     await execGit(['switch', targetBranch]);
-    const originalSha = await execGitWithOutput(['rev-parse', 'HEAD']);
+
+    // 🔒 预检查：在打 tag 前验证 npm 认证（如果启用了发布）
+    await verifyNpmPublishConfig();
 
     // 更新版本文件
     await updatePackageVersion(newVersion);
 
-    // 提交版本更改并推送
+    // 提交版本更改并推送（创建 tag）
     await commitAndPushVersion(newVersion, targetBranch);
 
     // 🎯 在打 tag 后更新 CHANGELOG - 使用 PR 信息
@@ -452,18 +404,13 @@ export async function updateVersionAndCreateTag(
     }
 
     // 🚀 发布到 npm - 只对目标分支版本发布
-    const { targetVersion } = versionParse(newVersion);
-    let publishSucceeded = true;
-
-    try {
-      publishSucceeded = await handleNpmPublish(newVersion, targetBranch);
-    } catch (publishError) {
-      await cleanupAfterPublishFailure(targetVersion, targetBranch, originalSha);
-      throw publishError;
-    }
+    // 注意：如果发布失败，tag 已经创建，可以稍后手动重新发布
+    const publishSucceeded = await handleNpmPublish(newVersion, targetBranch);
 
     if (!publishSucceeded) {
-      await cleanupAfterPublishFailure(targetVersion, targetBranch, originalSha);
+      logger.warning('⚠️  npm 发布失败，但 Git tag 已创建。你可以：');
+      logger.warning('   1. 修复问题后，使用相同的 tag 手动重新发布');
+      logger.warning('   2. 或者发布下一个补丁版本');
     }
   } catch (error) {
     throw new ActionError(`版本更新和标签创建失败: ${error}`, 'updateVersionAndCreateTag', error);

@@ -27,6 +27,30 @@ function getNpmPublishConfig() {
 }
 
 /**
+ * 验证 npm 认证是否有效（预检查）
+ */
+async function verifyNpmAuth(registry: string, token: string): Promise<void> {
+  try {
+    logger.info('预检查 npm 认证...');
+
+    // 临时配置认证
+    await configureNpmAuth(registry, token);
+
+    // 验证认证是否有效
+    try {
+      await exec('npm', ['whoami', '--registry', registry], {
+        env: { ...process.env, NODE_AUTH_TOKEN: token || '' },
+      });
+      logger.info('✅ npm 认证验证成功');
+    } catch (whoamiError) {
+      throw new ActionError(`npm 认证无效，无法执行 whoami 命令: ${whoamiError}`, 'verifyNpmAuth', whoamiError);
+    }
+  } catch (error) {
+    throw new ActionError(`npm 认证预检查失败: ${error}`, 'verifyNpmAuth', error);
+  }
+}
+
+/**
  * 配置 npm 认证
  */
 async function configureNpmAuth(registry: string, token: string): Promise<void> {
@@ -167,6 +191,25 @@ async function publishToNpm(
 }
 
 /**
+ * 预检查 npm 认证配置（导出供 git.ts 使用）
+ */
+export async function verifyNpmPublishConfig(): Promise<void> {
+  if (!isNpmPublishEnabled()) {
+    return; // 未启用发布，跳过检查
+  }
+
+  const config = getNpmPublishConfig();
+
+  // 验证必需的配置
+  if (!config.token) {
+    throw new ActionError('npm-token 未配置，无法发布到 npm', 'verifyNpmPublishConfig');
+  }
+
+  // 预检查认证
+  await verifyNpmAuth(config.registry, config.token);
+}
+
+/**
  * 处理 npm 发布逻辑 - 只对目标分支版本发布
  */
 export async function handleNpmPublish(version: string, targetBranch: SupportedBranch): Promise<boolean> {
@@ -191,16 +234,23 @@ export async function handleNpmPublish(version: string, targetBranch: SupportedB
     logger.info(`✅ ${targetBranch}分支版本 ${version} npm 发布完成`);
     return true;
   } catch (error) {
-    // npm 发布失败不应该中断整个流程
-    logger.error(`npm 发布失败: ${error}`);
+    // 记录详细的错误信息
+    logger.error(`❌ npm 发布失败: ${error}`);
     setOutput('npm-publish-failed', 'true');
     setOutput('npm-publish-error', String(error));
 
     // 如果用户要求严格模式，则抛出错误
     const strictMode = getInput('npm-publish-strict')?.toLowerCase() === 'true';
     if (strictMode) {
+      logger.error('npm-publish-strict 模式已启用，发布失败将中断工作流');
       throw error;
     }
+
+    // 非严格模式：记录警告但不中断流程
+    logger.warning('⚠️  npm 发布失败，但非严格模式允许继续。建议：');
+    logger.warning('   1. 检查错误日志，修复问题');
+    logger.warning('   2. 使用已创建的 Git tag 手动重新发布');
+    logger.warning('   3. 或者合并下一个 PR 触发新版本发布');
 
     return false;
   }
