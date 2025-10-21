@@ -1,5 +1,5 @@
 import process from 'node:process';
-import { exec } from '@actions/exec';
+import { exec, getExecOutput } from '@actions/exec';
 import { getBooleanInput, getInput, logger, setOutput } from './core';
 import type { SupportedBranch } from './types';
 import { ActionError, cleanVersion } from './utils';
@@ -31,6 +31,19 @@ function getNpmPublishConfig() {
  */
 async function configureNpmAuth(registry: string, token: string): Promise<void> {
   try {
+    let npmMajorVersion: number | null = null;
+    try {
+      const { stdout } = await getExecOutput('npm', ['--version'], { silent: true });
+      const version = stdout.trim();
+      const majorPart = Number.parseInt(version.split('.')[0] ?? '', 10);
+      if (!Number.isNaN(majorPart)) {
+        npmMajorVersion = majorPart;
+        logger.debug(`检测到 npm 版本: ${version}`);
+      }
+    } catch (detectError) {
+      logger.warning(`无法检测 npm 版本: ${detectError}`);
+    }
+
     // 设置 registry
     await exec('npm', ['config', 'set', 'registry', registry]);
     logger.info(`配置 npm registry: ${registry}`);
@@ -42,7 +55,16 @@ async function configureNpmAuth(registry: string, token: string): Promise<void> 
       const pathname = registryUrl.pathname.endsWith('/') ? registryUrl.pathname : `${registryUrl.pathname}/`;
       const scopedKey = `//${registryUrl.host}${pathname}`;
       await exec('npm', ['config', 'set', `${scopedKey}:_authToken`, token]);
-      await exec('npm', ['config', 'set', `${scopedKey}:always-auth`, 'true']);
+      const shouldConfigureAlwaysAuth = npmMajorVersion === null || npmMajorVersion < 10;
+      if (shouldConfigureAlwaysAuth) {
+        try {
+          await exec('npm', ['config', 'set', `${scopedKey}:always-auth`, 'true']);
+        } catch (alwaysAuthError) {
+          logger.warning(`配置 always-auth 失败，已忽略: ${alwaysAuthError}`);
+        }
+      } else {
+        logger.info('检测到 npm >= 10，无需配置 always-auth');
+      }
       logger.info('配置 npm 认证 token');
     }
   } catch (error) {
