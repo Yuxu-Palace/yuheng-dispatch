@@ -6,7 +6,7 @@ import { COMMIT_TEMPLATES, ERROR_MESSAGES, GIT_USER_CONFIG } from './constants';
 import { logger } from './core';
 import { handleNpmPublish } from './npm';
 import type { BranchSyncResult, PRData, SupportedBranch } from './types';
-import { ActionError, execGit, versionParse } from './utils';
+import { ActionError, execGit, execGitWithOutput, versionParse } from './utils';
 import { updatePackageVersion } from './version';
 
 // ==================== Git 基础操作 ====================
@@ -112,6 +112,21 @@ async function cleanupTagAfterFailure(tag: string): Promise<void> {
   } catch (error) {
     throw new ActionError(`清理标签 ${tag} 失败: ${error}`, 'cleanupTagAfterFailure', error);
   }
+}
+
+async function restoreBranchToSha(branch: SupportedBranch, sha: string): Promise<void> {
+  try {
+    await execGit(['reset', '--hard', sha]);
+    await execGit(['push', '--force-with-lease', 'origin', branch]);
+    logger.info(`已将分支 ${branch} 恢复到 ${sha}`);
+  } catch (error) {
+    throw new ActionError(`恢复分支 ${branch} 到 ${sha} 失败: ${error}`, 'restoreBranchToSha', error);
+  }
+}
+
+async function cleanupAfterPublishFailure(tag: string, branch: SupportedBranch, originalSha: string): Promise<void> {
+  await cleanupTagAfterFailure(tag);
+  await restoreBranchToSha(branch, originalSha);
 }
 
 // ==================== 分支同步逻辑 ====================
@@ -415,6 +430,7 @@ export async function updateVersionAndCreateTag(
     logger.info('开始执行版本更新...');
 
     await execGit(['switch', targetBranch]);
+    const originalSha = await execGitWithOutput(['rev-parse', 'HEAD']);
 
     // 更新版本文件
     await updatePackageVersion(newVersion);
@@ -442,12 +458,12 @@ export async function updateVersionAndCreateTag(
     try {
       publishSucceeded = await handleNpmPublish(newVersion, targetBranch);
     } catch (publishError) {
-      await cleanupTagAfterFailure(targetVersion);
+      await cleanupAfterPublishFailure(targetVersion, targetBranch, originalSha);
       throw publishError;
     }
 
     if (!publishSucceeded) {
-      await cleanupTagAfterFailure(targetVersion);
+      await cleanupAfterPublishFailure(targetVersion, targetBranch, originalSha);
     }
   } catch (error) {
     throw new ActionError(`版本更新和标签创建失败: ${error}`, 'updateVersionAndCreateTag', error);
