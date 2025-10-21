@@ -79,6 +79,41 @@ async function safePushWithRetry(targetBranch: SupportedBranch, version: string,
   }
 }
 
+async function deleteTagSafely(tag: string): Promise<void> {
+  let localDeleted = false;
+
+  try {
+    await execGit(['tag', '-d', tag]);
+    logger.info(`已删除本地标签: ${tag}`);
+    localDeleted = true;
+  } catch (error) {
+    logger.warning(`删除本地标签 ${tag} 失败或不存在: ${error}`);
+  }
+
+  try {
+    await execGit(['push', 'origin', `:refs/tags/${tag}`]);
+    logger.info(`已删除远程标签: ${tag}`);
+  } catch (error) {
+    const message = `删除远程标签 ${tag} 失败: ${error}`;
+    if (localDeleted) {
+      logger.error(message);
+    } else {
+      logger.warning(message);
+    }
+    throw new ActionError(message, 'deleteTagSafely', error);
+  }
+}
+
+async function cleanupTagAfterFailure(tag: string): Promise<void> {
+  try {
+    logger.warning(`npm 发布失败，开始清理标签 ${tag}`);
+    await deleteTagSafely(tag);
+    logger.info(`已清理失败发布产生的标签: ${tag}`);
+  } catch (error) {
+    throw new ActionError(`清理标签 ${tag} 失败: ${error}`, 'cleanupTagAfterFailure', error);
+  }
+}
+
 // ==================== 分支同步逻辑 ====================
 
 /**
@@ -401,7 +436,19 @@ export async function updateVersionAndCreateTag(
     }
 
     // 🚀 发布到 npm - 只对目标分支版本发布
-    await handleNpmPublish(newVersion, targetBranch);
+    const { targetVersion } = versionParse(newVersion);
+    let publishSucceeded = true;
+
+    try {
+      publishSucceeded = await handleNpmPublish(newVersion, targetBranch);
+    } catch (publishError) {
+      await cleanupTagAfterFailure(targetVersion);
+      throw publishError;
+    }
+
+    if (!publishSucceeded) {
+      await cleanupTagAfterFailure(targetVersion);
+    }
   } catch (error) {
     throw new ActionError(`版本更新和标签创建失败: ${error}`, 'updateVersionAndCreateTag', error);
   }

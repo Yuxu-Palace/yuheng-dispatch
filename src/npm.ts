@@ -140,13 +140,9 @@ async function publishToNpm(
     publishArgs.push('--tag', publishTag);
 
     // 执行发布
-    await exec('npm', publishArgs);
-    const code = await exec('npm', publishArgs, {
+    await exec('npm', publishArgs, {
       env: { ...process.env, NODE_AUTH_TOKEN: config.token || '' },
     });
-    if (code !== 0) {
-      throw new Error(`npm publish 失败，退出码：${code}`);
-    }
 
     logger.info(`✅ 成功发布到 npm: ${version} (标签: ${publishTag})`);
 
@@ -174,10 +170,10 @@ async function publishToNpm(
 /**
  * 处理 npm 发布逻辑 - 只对目标分支版本发布
  */
-export async function handleNpmPublish(version: string, targetBranch: SupportedBranch): Promise<void> {
+export async function handleNpmPublish(version: string, targetBranch: SupportedBranch): Promise<boolean> {
   if (!isNpmPublishEnabled()) {
     logger.info('npm 发布已禁用，跳过');
-    return;
+    return true;
   }
 
   try {
@@ -194,6 +190,7 @@ export async function handleNpmPublish(version: string, targetBranch: SupportedB
     await publishToNpm(version, targetBranch, config);
 
     logger.info(`✅ ${targetBranch}分支版本 ${version} npm 发布完成`);
+    return true;
   } catch (error) {
     // npm 发布失败不应该中断整个流程
     logger.error(`npm 发布失败: ${error}`);
@@ -205,5 +202,7 @@ export async function handleNpmPublish(version: string, targetBranch: SupportedB
     if (strictMode) {
       throw error;
     }
+
+    return false;
   }
 }
