@@ -6,7 +6,7 @@ import { COMMIT_TEMPLATES, ERROR_MESSAGES, GIT_USER_CONFIG } from './constants';
 import { logger } from './core';
 import { handleNpmPublish, verifyNpmPublishConfig } from './npm';
 import type { BranchSyncResult, PRData, SupportedBranch } from './types';
-import { ActionError, execGit, versionParse } from './utils';
+import { ActionError, execGit, execGitWithOutput, versionParse } from './utils';
 import { updatePackageVersion } from './version';
 
 // ==================== Git 基础操作 ====================
@@ -368,6 +368,90 @@ export async function syncBranches(targetBranch: SupportedBranch, newVersion: st
 
 // ==================== 版本更新和标签创建 ====================
 
+interface ReleaseRollbackContext {
+  versionCommitSha: string | null;
+  changelogCommitSha: string | null;
+  tagName: string;
+  targetBranch: SupportedBranch;
+  tagCreated: boolean;
+}
+
+async function deleteTagIfExists(tagName: string, tagCreated: boolean): Promise<void> {
+  if (!(tagName && tagCreated)) {
+    return;
+  }
+
+  try {
+    await execGit(['tag', '-d', tagName]);
+    logger.info(`已删除本地标签: ${tagName}`);
+  } catch (error) {
+    logger.warning(`删除本地标签 ${tagName} 失败（可能不存在）: ${error}`);
+  }
+
+  try {
+    await execGit(['push', 'origin', `:refs/tags/${tagName}`]);
+    logger.info(`已删除远程标签: ${tagName}`);
+  } catch (error) {
+    logger.warning(`删除远程标签 ${tagName} 失败（可能不存在）: ${error}`);
+  }
+}
+
+async function rollbackRelease(releaseContext: ReleaseRollbackContext): Promise<void> {
+  const { versionCommitSha, changelogCommitSha, tagName, targetBranch, tagCreated } = releaseContext;
+
+  if (!(versionCommitSha || changelogCommitSha)) {
+    logger.info('未检测到需要回滚的提交，跳过回滚流程');
+    await deleteTagIfExists(tagName, tagCreated);
+    return;
+  }
+
+  logger.warning('检测到 npm 发布失败，开始回滚版本提交和标签');
+
+  try {
+    await execGit(['switch', targetBranch]);
+  } catch (error) {
+    logger.warning(`回滚流程切换至 ${targetBranch} 分支失败: ${error}`);
+  }
+
+  const commitsToRevert: string[] = [];
+  if (changelogCommitSha) {
+    commitsToRevert.push(changelogCommitSha);
+  }
+  if (versionCommitSha) {
+    commitsToRevert.push(versionCommitSha);
+  }
+
+  let hasReverted = false;
+
+  for (let i = 0; i < commitsToRevert.length; i++) {
+    const commitSha = commitsToRevert[i];
+    try {
+      await execGit(['revert', '--no-edit', commitSha]);
+      logger.info(`已回滚提交 ${commitSha}`);
+      hasReverted = true;
+    } catch (error) {
+      logger.error(`回滚提交 ${commitSha} 失败: ${error}`);
+      try {
+        await execGit(['revert', '--abort']);
+      } catch (abortError) {
+        logger.warning(`执行 revert --abort 时出错（可能无进行中的回滚）: ${abortError}`);
+      }
+      throw new ActionError(`回滚提交 ${commitSha} 失败，需要人工介入: ${error}`, 'rollbackRelease', error);
+    }
+  }
+
+  if (hasReverted) {
+    try {
+      await execGit(['push', 'origin', targetBranch]);
+      logger.info(`已推送回滚提交到 ${targetBranch}`);
+    } catch (error) {
+      throw new ActionError(`推送回滚提交到远程失败: ${error}`, 'rollbackRelease', error);
+    }
+  }
+
+  await deleteTagIfExists(tagName, tagCreated);
+}
+
 /**
  * 更新版本并创建标签 - 支持基于 PR 的 CHANGELOG 生成和 npm 发布
  */
@@ -376,6 +460,16 @@ export async function updateVersionAndCreateTag(
   targetBranch: SupportedBranch,
   pr: PRData | null = null,
 ): Promise<void> {
+  const parsedVersion = versionParse(newVersion);
+  const rollbackContext: ReleaseRollbackContext = {
+    versionCommitSha: null,
+    changelogCommitSha: null,
+    tagName: parsedVersion.targetVersion,
+    targetBranch,
+    tagCreated: false,
+  };
+  let rollbackTriggered = false;
+
   try {
     logger.info('开始执行版本更新...');
 
@@ -389,6 +483,8 @@ export async function updateVersionAndCreateTag(
 
     // 提交版本更改并推送（创建 tag）
     await commitAndPushVersion(newVersion, targetBranch);
+    rollbackContext.tagCreated = true;
+    rollbackContext.versionCommitSha = await execGitWithOutput(['rev-parse', 'HEAD']);
 
     // 🎯 在打 tag 后更新 CHANGELOG - 使用 PR 信息
     await updateChangelog(pr, newVersion);
@@ -397,6 +493,7 @@ export async function updateVersionAndCreateTag(
     const hasChanges = await hasChangelogChanges();
     if (hasChanges) {
       await commitChangelog(newVersion, targetBranch);
+      rollbackContext.changelogCommitSha = await execGitWithOutput(['rev-parse', 'HEAD']);
     } else {
       const errorMessage = 'CHANGELOG 未生成任何内容，这不应该发生。请检查 PR 描述或提交历史是否包含足够的变更信息。';
       logger.error(errorMessage);
@@ -408,11 +505,21 @@ export async function updateVersionAndCreateTag(
     const publishSucceeded = await handleNpmPublish(newVersion, targetBranch);
 
     if (!publishSucceeded) {
-      logger.warning('⚠️  npm 发布失败，但 Git tag 已创建。你可以：');
-      logger.warning('   1. 修复问题后，使用相同的 tag 手动重新发布');
-      logger.warning('   2. 或者发布下一个补丁版本');
+      rollbackTriggered = true;
+      await rollbackRelease(rollbackContext);
+      logger.warning('⚠️  npm 发布失败，已自动回滚版本提交和标签。后续建议：');
+      logger.warning('   1. 修复发布问题后重新触发版本流程');
+      logger.warning('   2. 如需立即发布，可在本地验证后重新运行预期流程');
     }
   } catch (error) {
+    if (!rollbackTriggered && (rollbackContext.versionCommitSha || rollbackContext.changelogCommitSha)) {
+      rollbackTriggered = true;
+      try {
+        await rollbackRelease(rollbackContext);
+      } catch (rollbackError) {
+        logger.error(`自动回滚流程失败，需要人工处理: ${rollbackError}`);
+      }
+    }
     throw new ActionError(`版本更新和标签创建失败: ${error}`, 'updateVersionAndCreateTag', error);
   }
 }

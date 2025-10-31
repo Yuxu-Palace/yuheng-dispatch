@@ -282,7 +282,7 @@ export async function handleNpmPublish(version: string, targetBranch: SupportedB
 }
 
 function handleNpmPublishFailure(error: unknown): boolean {
-  logPublishFailure(error);
+  logger.error(`❌ npm 发布失败: ${error}`);
   setPublishFailureOutputs(error);
 
   if (isStrictModeEnabled()) {
@@ -292,10 +292,6 @@ function handleNpmPublishFailure(error: unknown): boolean {
 
   logNonStrictModeWarnings();
   return false;
-}
-
-function logPublishFailure(error: unknown): void {
-  logger.error(`❌ npm 发布失败: ${error}`);
 }
 
 function setPublishFailureOutputs(error: unknown): void {
@@ -310,6 +306,6 @@ function isStrictModeEnabled(): boolean {
 function logNonStrictModeWarnings(): void {
   logger.warning('⚠️  npm 发布失败，但非严格模式允许继续。建议：');
   logger.warning('   1. 检查错误日志，修复问题');
-  logger.warning('   2. 使用已创建的 Git tag 手动重新发布');
-  logger.warning('   3. 或者合并下一个 PR 触发新版本发布');
+  logger.warning('   2. 行为已回滚，可修复问题后重新触发自动发布流程');
+  logger.warning('   3. 如需立即发布，可在本地验证后手动执行 npm publish');
 }
