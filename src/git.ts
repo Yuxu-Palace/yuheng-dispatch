@@ -421,14 +421,11 @@ async function rollbackRelease(releaseContext: ReleaseRollbackContext): Promise<
     commitsToRevert.push(versionCommitSha);
   }
 
-  let hasReverted = false;
-
   for (let i = 0; i < commitsToRevert.length; i++) {
     const commitSha = commitsToRevert[i];
     try {
       await execGit(['revert', '--no-edit', commitSha]);
       logger.info(`已回滚提交 ${commitSha}`);
-      hasReverted = true;
     } catch (error) {
       logger.error(`回滚提交 ${commitSha} 失败: ${error}`);
       try {
@@ -440,13 +437,11 @@ async function rollbackRelease(releaseContext: ReleaseRollbackContext): Promise<
     }
   }
 
-  if (hasReverted) {
-    try {
-      await execGit(['push', 'origin', targetBranch]);
-      logger.info(`已推送回滚提交到 ${targetBranch}`);
-    } catch (error) {
-      throw new ActionError(`推送回滚提交到远程失败: ${error}`, 'rollbackRelease', error);
-    }
+  try {
+    await execGit(['push', 'origin', targetBranch]);
+    logger.info(`已推送回滚提交到 ${targetBranch}`);
+  } catch (error) {
+    throw new ActionError(`推送回滚提交到远程失败: ${error}`, 'rollbackRelease', error);
   }
 
   await deleteTagIfExists(tagName, tagCreated);
