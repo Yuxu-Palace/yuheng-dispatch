@@ -87,10 +87,12 @@ async function safePushWithRetry(targetBranch: SupportedBranch, version: string,
 function isAutoSyncCommit(): boolean {
   // 检查最近的提交消息是否包含同步标记
   const commitMessage = context.payload.head_commit?.message || '';
-  const isSkipCI = commitMessage.includes('[skip ci]');
-  const isSyncCommit = commitMessage.includes('chore: sync') || commitMessage.includes('chore: bump version');
 
-  if (isSkipCI || isSyncCommit) {
+  if (
+    commitMessage.includes('[skip ci]') ||
+    commitMessage.includes('chore: sync') ||
+    commitMessage.includes('chore: bump version')
+  ) {
     logger.info(`检测到自动提交: ${commitMessage}`);
     return true;
   }
@@ -374,6 +376,7 @@ interface ReleaseRollbackContext {
   tagName: string;
   targetBranch: SupportedBranch;
   tagCreated: boolean;
+  rollbackCompleted: boolean; // 标记回滚是否已完成，确保幂等性
 }
 
 async function deleteTagIfExists(tagName: string, tagCreated: boolean): Promise<void> {
@@ -397,11 +400,17 @@ async function deleteTagIfExists(tagName: string, tagCreated: boolean): Promise<
 }
 
 async function rollbackRelease(releaseContext: ReleaseRollbackContext): Promise<void> {
-  const { versionCommitSha, changelogCommitSha, tagName, targetBranch, tagCreated } = releaseContext;
+  const { versionCommitSha, changelogCommitSha, tagName, targetBranch, tagCreated, rollbackCompleted } = releaseContext;
+
+  if (rollbackCompleted) {
+    logger.info('回滚已完成，跳过重复执行');
+    return;
+  }
 
   if (!(versionCommitSha || changelogCommitSha)) {
     logger.info('未检测到需要回滚的提交，跳过回滚流程');
     await deleteTagIfExists(tagName, tagCreated);
+    releaseContext.rollbackCompleted = true;
     return;
   }
 
@@ -445,6 +454,8 @@ async function rollbackRelease(releaseContext: ReleaseRollbackContext): Promise<
   }
 
   await deleteTagIfExists(tagName, tagCreated);
+
+  releaseContext.rollbackCompleted = true;
 }
 
 /**
@@ -462,8 +473,8 @@ export async function updateVersionAndCreateTag(
     tagName: parsedVersion.targetVersion,
     targetBranch,
     tagCreated: false,
+    rollbackCompleted: false,
   };
-  let rollbackTriggered = false;
 
   try {
     logger.info('开始执行版本更新...');
@@ -500,15 +511,13 @@ export async function updateVersionAndCreateTag(
     const publishSucceeded = await handleNpmPublish(newVersion, targetBranch);
 
     if (!publishSucceeded) {
-      rollbackTriggered = true;
       await rollbackRelease(rollbackContext);
       logger.warning('⚠️  npm 发布失败，已自动回滚版本提交和标签。后续建议：');
       logger.warning('   1. 修复发布问题后重新触发版本流程');
       logger.warning('   2. 如需立即发布，可在本地验证后重新运行预期流程');
     }
   } catch (error) {
-    if (!rollbackTriggered && (rollbackContext.versionCommitSha || rollbackContext.changelogCommitSha)) {
-      rollbackTriggered = true;
+    if (rollbackContext.versionCommitSha || rollbackContext.changelogCommitSha) {
       try {
         await rollbackRelease(rollbackContext);
       } catch (rollbackError) {
