@@ -1,3 +1,10 @@
+## [v0.1.2-alpha.0] - 2025-12-09
+
+### 🐛 Bug Fixes
+- fix: 修复 npm 认证字段 & 增加发布预检查 ([#23](https://github.com/Yuxu-Palace/yuheng-dispatch/pull/23))
+  - by CodeRabbit
+
+
 ## [v0.1.1] - 2025-10-11
 
 ### 📝 Changes
