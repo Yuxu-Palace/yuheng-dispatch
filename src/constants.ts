@@ -5,7 +5,7 @@ import type { VersionPreviewData } from './types';
 
 export const SUPPORTED_BRANCHES = getInput('supported-branches')
   ?.split(',')
-  .map((branch) => branch.trim()) || ['main', 'beta', 'alpha'];
+  .map((branch) => branch.trim()) || ['main', 'beta'];
 
 /** 支持的前缀列表（用于兼容性处理） */
 const SUPPORTED_PREFIXES = ['v', 'version-', 'ver-', 'rel-'] as const;
@@ -40,7 +40,6 @@ export const COMMENT_CONFIG = {
 export const DEFAULT_VERSIONS = {
   BASE: '0.0.0',
   BETA: '0.0.0-beta.0',
-  ALPHA: '0.0.0-alpha.0',
 } as const;
 
 // ==================== CHANGELOG 相关常量 ====================
@@ -81,7 +80,7 @@ export const COMMENT_TEMPLATES = {
 
 ${errorMessage}
 
-> 请确保在创建新功能之前，所有已有功能都已完成完整的发布流程（alpha → beta → main）。`,
+> 请确保在创建新功能之前，所有已有功能都已完成完整的发布流程（beta → main）。`,
 
   /** 版本跳过模板 */
   VERSION_SKIP: (targetBranch: string, baseVersion: string | null) => `## ${COMMENT_CONFIG.TITLE}
@@ -119,7 +118,6 @@ export const PR_SECTION_PATTERNS = [
 /** 提交消息模板 */
 export const COMMIT_TEMPLATES = {
   VERSION_BUMP: (version: string, branch: string) => `chore: bump version to ${version} for ${branch}`,
-  SYNC_BETA_TO_ALPHA: (version: string) => `chore: sync beta v${version} to alpha [skip ci]`,
   SYNC_MAIN_TO_BETA: (version: string) => `chore: sync main v${version} to beta [skip ci]`,
   FORCE_SYNC: (version: string) => `chore: force sync from main v${version} [skip ci]`,
   CHANGELOG_UPDATE: (version: string) => `docs: update CHANGELOG for ${version}`,

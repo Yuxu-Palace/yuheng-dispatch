@@ -165,7 +165,6 @@ export function getVersionSummary(version: string): VersionSummary {
 interface VersionCache {
   main?: string | null;
   beta?: string | null;
-  alpha?: string | null;
 }
 
 /**
@@ -211,16 +210,13 @@ class VersionManager {
     // 解析各分支的最新版本
     this.cache.main = this.parseMainVersion(allTags);
     this.cache.beta = this.parseBranchVersion(allTags, 'beta');
-    this.cache.alpha = this.parseBranchVersion(allTags, 'alpha');
 
-    logger.info(
-      `📊 版本概览: main=${this.cache.main || '无'}, beta=${this.cache.beta || '无'}, alpha=${this.cache.alpha || '无'}`,
-    );
+    logger.info(`📊 版本概览: main=${this.cache.main || '无'}, beta=${this.cache.beta || '无'}`);
 
     this.isInitialized = true;
   }
 
-  async getLatestVersion(branch: 'main' | 'beta' | 'alpha'): Promise<string | null> {
+  async getLatestVersion(branch: 'main' | 'beta'): Promise<string | null> {
     await this.initialize();
     return this.cache[branch] || null;
   }
@@ -228,7 +224,7 @@ class VersionManager {
   async getGlobalHighestVersion(): Promise<string> {
     await this.initialize();
 
-    const versions = [this.cache.main, this.cache.beta, this.cache.alpha].filter(Boolean);
+    const versions = [this.cache.main, this.cache.beta].filter(Boolean);
 
     if (versions.length === 0) {
       return createDefaultVersion('BASE');
@@ -256,14 +252,11 @@ class VersionManager {
     return allTags.length > 0 ? allTags[0] : null;
   }
 
-  getTagType(tag: string): 'release' | 'beta' | 'alpha' | 'unknown' {
+  getTagType(tag: string): 'release' | 'beta' | 'unknown' {
     if (!tag) {
       return 'unknown';
     }
 
-    if (tag.includes('-alpha.')) {
-      return 'alpha';
-    }
     if (tag.includes('-beta.')) {
       return 'beta';
     }
@@ -301,13 +294,9 @@ async function validateBranchVersionState(targetBranch: SupportedBranch, pr: PRD
 
   // 基于最新 tag 类型和目标分支检查是否允许
   const branchValidationRules: Record<SupportedBranch, { allowedTypes: string[]; errorMsg: string }> = {
-    alpha: {
-      allowedTypes: ['release', 'alpha'],
-      errorMsg: 'Alpha 分支只能在正式版本或 Alpha 版本后继续开发',
-    },
     beta: {
-      allowedTypes: ['alpha', 'beta'],
-      errorMsg: 'Beta 分支只能在 Alpha 版本或 Beta 版本后继续开发',
+      allowedTypes: ['release', 'beta'],
+      errorMsg: 'Beta 分支只能在正式版本或 Beta 版本后继续开发',
     },
     main: {
       allowedTypes: ['beta'],
@@ -376,12 +365,12 @@ function createUpgradeContext(
 }
 
 /**
- * Alpha 分支策略 - 基于 PR 标签处理
+ * Beta 分支策略 - 基于 PR 标签处理版本升级（接受任意功能分支）
  */
-class AlphaStrategy implements VersionUpgradeStrategy {
-  description = 'Alpha 分支基于 PR 标签处理版本升级';
+class BetaStrategy implements VersionUpgradeStrategy {
+  description = 'Beta 分支基于 PR 标签处理版本升级（接受任意功能分支）';
 
-  private async calculateAlphaVersion(context: VersionUpgradeContext, releaseType: ReleaseType): Promise<string> {
+  private async calculateBetaVersion(context: VersionUpgradeContext, releaseType: ReleaseType): Promise<string> {
     const { baseVersion } = context;
 
     // 获取 Main 分支的版本作为基础
@@ -405,41 +394,41 @@ class AlphaStrategy implements VersionUpgradeStrategy {
 
     logger.info(`🏷️ 根据标签 ${releaseType} 从 Main 版本推导目标版本: ${mainBaseVersion} -> ${targetBaseVersion}`);
 
-    // 获取当前 Alpha 分支的最新版本
-    const currentAlphaVersion = await versionManager.getLatestVersion('alpha');
-    const currentAlphaBaseVersion = currentAlphaVersion ? getBaseVersionString(currentAlphaVersion) : '0.0.0';
+    // 获取当前 Beta 分支的最新版本
+    const currentBetaVersion = await versionManager.getLatestVersion('beta');
+    const currentBetaBaseVersion = currentBetaVersion ? getBaseVersionString(currentBetaVersion) : '0.0.0';
 
-    // 判断 Alpha 基础号与 Main 基础号的关系
-    if (currentAlphaBaseVersion === mainBaseVersion) {
-      // Alpha 基础号与 Main 一致，说明是新功能进入 Alpha 测试，直接使用目标版本
-      const newAlphaVersion = `${targetBaseVersion}-alpha.0`;
-      logger.info(`🆕 Alpha 基础号与 Main 一致，创建新功能 Alpha 版本: ${newAlphaVersion}`);
-      return newAlphaVersion;
+    // 判断 Beta 基础号与 Main 基础号的关系
+    if (currentBetaBaseVersion === mainBaseVersion) {
+      // Beta 基础号与 Main 一致，说明是新功能进入 Beta 测试，直接使用目标版本
+      const newBetaVersion = `${targetBaseVersion}-beta.0`;
+      logger.info(`🆕 Beta 基础号与 Main 一致，创建新功能 Beta 版本: ${newBetaVersion}`);
+      return newBetaVersion;
     }
-    // Alpha 基础号与 Main 不一致，说明已有新功能在 Alpha 测试
-    // 比较 main+label 和当前 alpha 版本，取版本号高的
+    // Beta 基础号与 Main 不一致，说明已有新功能在 Beta 测试
+    // 比较 main+label 和当前 beta 版本，取版本号高的
 
-    if (semver.gt(targetBaseVersion, currentAlphaBaseVersion)) {
+    if (semver.gt(targetBaseVersion, currentBetaBaseVersion)) {
       // main+label 版本更高，修改基础号并重置测试号
-      const newAlphaVersion = `${targetBaseVersion}-alpha.0`;
+      const newBetaVersion = `${targetBaseVersion}-beta.0`;
       logger.info(
-        `🔼 目标版本高于当前 Alpha 基础版本 (${targetBaseVersion} > ${currentAlphaBaseVersion})，重置版本线: ${newAlphaVersion}`,
+        `🔼 目标版本高于当前 Beta 基础版本 (${targetBaseVersion} > ${currentBetaBaseVersion})，重置版本线: ${newBetaVersion}`,
       );
-      return newAlphaVersion;
+      return newBetaVersion;
     }
-    // main+label 版本不高于当前 alpha，增加测试号计数
-    if (!currentAlphaVersion) {
-      throw new Error('无法增加测试号：当前 Alpha 版本为空');
+    // main+label 版本不高于当前 beta，增加测试号计数
+    if (!currentBetaVersion) {
+      throw new Error('无法增加测试号：当前 Beta 版本为空');
     }
-    const incrementedVersion = semver.inc(currentAlphaVersion, 'prerelease', 'alpha');
+    const incrementedVersion = semver.inc(currentBetaVersion, 'prerelease', 'beta');
     logger.info(
-      `🔄 目标版本不高于当前 Alpha 基础版本 (${targetBaseVersion} <= ${currentAlphaBaseVersion})，递增测试号: ${incrementedVersion}`,
+      `🔄 目标版本不高于当前 Beta 基础版本 (${targetBaseVersion} <= ${currentBetaBaseVersion})，递增测试号: ${incrementedVersion}`,
     );
-    return incrementedVersion || currentAlphaVersion;
+    return incrementedVersion || currentBetaVersion;
   }
 
   canHandle(context: VersionUpgradeContext): boolean {
-    return context.targetBranch === 'alpha';
+    return context.targetBranch === 'beta';
   }
 
   async execute(context: VersionUpgradeContext): Promise<string | null> {
@@ -447,7 +436,7 @@ class AlphaStrategy implements VersionUpgradeStrategy {
 
     // 检查 PR 标签
     if (!pr?.labels || pr.labels.length === 0) {
-      logger.info('📛 Alpha 分支无 PR 标签，跳过版本升级');
+      logger.info('📛 Beta 分支无 PR 标签，跳过版本升级');
       return null;
     }
 
@@ -460,55 +449,78 @@ class AlphaStrategy implements VersionUpgradeStrategy {
     }
 
     logger.info(`✅ 使用 PR 标签: ${releaseType} (来源: PR #${pr.number})`);
-    return await this.calculateAlphaVersion(context, releaseType);
+    return await this.calculateBetaVersion(context, releaseType);
   }
 }
 
 /**
- * Beta 分支策略 - 基于源分支判断处理方式
- */
-class BetaStrategy implements VersionUpgradeStrategy {
-  description = 'Beta 分支基于源分支类型处理版本升级';
-
-  canHandle(context: VersionUpgradeContext): boolean {
-    return context.targetBranch === 'beta';
-  }
-
-  async execute(context: VersionUpgradeContext): Promise<string | null> {
-    const { sourceBranch, baseVersion } = context;
-
-    if (sourceBranch === 'alpha') {
-      // 源分支是 Alpha：取 Alpha 的基础号并重置测试号
-      const alphaBaseVersion = getBaseVersionString(baseVersion);
-      const newBetaVersion = `${alphaBaseVersion}-beta.0`;
-      logger.info(`🆕 从 Alpha 创建/升级 Beta 版本: ${baseVersion} -> ${newBetaVersion}`);
-      return newBetaVersion;
-    }
-    // 源分支不是 Alpha：递增 Beta 测试号
-    const incrementedVersion = semver.inc(baseVersion, 'prerelease', 'beta');
-    logger.info(`🔄 递增 Beta 测试号: ${baseVersion} -> ${incrementedVersion} (源分支: ${sourceBranch})`);
-    return incrementedVersion || baseVersion;
-  }
-}
-
-/**
- * Main 分支策略 - 只接受 Beta 分支来源
+ * Main 分支策略 - 接受 Beta（正常发布）或 Hotfix（紧急修复）
  */
 class MainStrategy implements VersionUpgradeStrategy {
-  description = 'Main 分支只接受 Beta 来源，转换为正式版本';
+  description = 'Main 分支接受 Beta（正常发布）或 Hotfix（紧急修复）';
 
   canHandle(context: VersionUpgradeContext): boolean {
     return context.targetBranch === 'main';
   }
 
   async execute(context: VersionUpgradeContext): Promise<string | null> {
-    const { baseVersion } = context;
+    const { baseVersion, sourceBranch, pr } = context;
 
-    // 从 Beta 转换到 Main：取 Beta 的基础号作为正式版本号
-    const betaBaseVersion = getBaseVersionString(baseVersion);
+    // 场景 1: 来自 Beta - 正常发布流程
+    if (sourceBranch === 'beta') {
+      const betaBaseVersion = getBaseVersionString(baseVersion);
+      logger.info(`🚀 从 Beta 转换为正式版: ${baseVersion} -> ${betaBaseVersion}`);
+      return betaBaseVersion;
+    }
 
-    logger.info(`🚀 从 Beta 转换为正式版: ${baseVersion} -> ${betaBaseVersion}`);
-    return betaBaseVersion;
+    // 场景 2: 来自 Hotfix - 紧急修复流程
+    if (sourceBranch.startsWith('hotfix/')) {
+      // 检查必须有 hotfix 标签
+      const hasHotfixLabel = pr?.labels?.some((label) => label.name.toLowerCase() === 'hotfix');
+      if (!hasHotfixLabel) {
+        const errorMsg = 'Hotfix 分支必须添加 "hotfix" 标签才能合并到 Main 分支';
+        logger.error(`❌ ${errorMsg}`);
+        throw new Error(errorMsg);
+      }
+
+      // 检查必须有版本标签
+      if (!pr?.labels || pr.labels.length === 0) {
+        const errorMsg = 'Hotfix 分支必须添加版本标签（major/minor/patch）';
+        logger.error(`❌ ${errorMsg}`);
+        throw new Error(errorMsg);
+      }
+
+      const releaseType = getReleaseTypeFromLabels(pr.labels);
+      if (!releaseType) {
+        const allLabelNames = pr.labels.map((label) => label.name).join(', ');
+        const errorMsg = `Hotfix PR 有标签但缺少版本标签（major/minor/patch），当前标签: [${allLabelNames}]`;
+        logger.error(`❌ ${errorMsg}`);
+        throw new Error(errorMsg);
+      }
+
+      // 根据标签类型递增版本
+      const releaseTypeMapping: Record<string, ReleaseType> = {
+        premajor: 'major',
+        preminor: 'minor',
+        prepatch: 'patch',
+      };
+      const baseReleaseType: ReleaseType = releaseTypeMapping[releaseType] || releaseType;
+      const newVersion = semver.inc(baseVersion, baseReleaseType);
+
+      if (!newVersion) {
+        const errorMsg = `无法根据标签 ${releaseType} 计算 Hotfix 版本`;
+        logger.error(`❌ ${errorMsg}`);
+        throw new Error(errorMsg);
+      }
+
+      logger.info(`🔥 Hotfix 紧急修复: ${baseVersion} + ${releaseType} -> ${newVersion}`);
+      return newVersion;
+    }
+
+    // 场景 3: 其他分支 - 不允许
+    const errorMsg = `Main 分支只接受来自 Beta 或 Hotfix 分支的合并，当前源分支: ${sourceBranch}`;
+    logger.error(`❌ ${errorMsg}`);
+    throw new Error(errorMsg);
   }
 }
 
@@ -516,7 +528,7 @@ class MainStrategy implements VersionUpgradeStrategy {
  * 版本升级策略管理器
  */
 class VersionUpgradeManager {
-  private readonly strategies: VersionUpgradeStrategy[] = [new AlphaStrategy(), new BetaStrategy(), new MainStrategy()];
+  private readonly strategies: VersionUpgradeStrategy[] = [new BetaStrategy(), new MainStrategy()];
 
   /**
    * 执行版本升级
@@ -553,80 +565,39 @@ const upgradeManager = new VersionUpgradeManager();
 // ==================== 版本升级逻辑 ====================
 
 /**
- * 获取 Alpha 分支基础版本
- */
-async function getAlphaBaseVersion(sourceBranch: string, pr: PRData | null): Promise<string | null> {
-  // Alpha 分支：判断源分支类型
-  if (sourceBranch === 'beta' || sourceBranch === 'main') {
-    const errorMsg = `Alpha 分支不接受来自${sourceBranch}分支的合并，Alpha 分支只能用于新功能开发`;
-    logger.error(`❌ ${errorMsg}`);
-    await throwErrorWithComment(errorMsg, 'getBaseVersion-alpha', pr);
-  }
-
-  const currentAlphaVersion = await versionManager.getLatestVersion('alpha');
-  const mainVersion = await versionManager.getLatestVersion('main');
-  const mainBaseVersion = mainVersion ? getBaseVersionString(mainVersion) : '0.0.0';
-
-  if (!currentAlphaVersion) {
-    // 没有 Alpha 版本，基于 Main 分支版本开始
-    const baseVersion = mainVersion || createDefaultVersion('BASE');
-    logger.info(`📌 Alpha 分支基础版本: ${baseVersion} (无 Alpha 版本，基于 Main 版本)`);
-    return baseVersion;
-  }
-
-  // 比较 Alpha 基础号和 Main 版本
-  const alphaBaseVersion = getBaseVersionString(currentAlphaVersion);
-
-  if (alphaBaseVersion === mainBaseVersion) {
-    // Alpha 基础号与 Main 一致，说明是新功能要进入 Alpha 测试
-    logger.info(
-      `📌 Alpha 分支基础版本: ${mainVersion || createDefaultVersion('BASE')} (Alpha 基础号与 Main 一致，准备新功能测试)`,
-    );
-    return mainVersion || createDefaultVersion('BASE');
-  }
-  // Alpha 基础号与 Main 不一致，说明已有新功能在 Alpha 测试
-  logger.info(`📌 Alpha 分支基础版本: ${currentAlphaVersion} (Alpha 基础号与 Main 不一致，已有功能在测试)`);
-  return currentAlphaVersion;
-}
-
-/**
  * 获取 Beta 分支基础版本
  */
 async function getBetaBaseVersion(sourceBranch: string, pr: PRData | null): Promise<string | null> {
-  const currentBetaVersion = await versionManager.getLatestVersion('beta');
-  const alphaVersion = await versionManager.getLatestVersion('alpha');
-
-  if (sourceBranch === 'alpha') {
-    // 源分支是 Alpha：新功能进入 Beta 测试
-    if (!alphaVersion) {
-      const errorMsg = '从 Alpha 合并到 Beta 失败：没有可用的 Alpha 版本';
-      logger.error(`❌ ${errorMsg}`);
-      await throwErrorWithComment(errorMsg, 'getBaseVersion-beta', pr);
-    }
-    logger.info(`📌 Beta 分支基础版本: ${alphaVersion} (源分支 Alpha，新功能进入 Beta 测试)`);
-    return alphaVersion;
-  }
-
-  // 源分支不是 Alpha：Beta 版本的增量更新
-  if (!currentBetaVersion) {
-    const errorMsg = `非 Alpha 分支合并到 Beta 失败：没有对应的 Beta 版本，全新功能必须先经过 Alpha 测试 (源分支: ${sourceBranch})`;
+  // Beta 分支：不接受来自 Main 的合并
+  if (sourceBranch === 'main') {
+    const errorMsg = 'Beta 分支不接受来自 Main 分支的合并，Beta 分支只能用于新功能开发';
     logger.error(`❌ ${errorMsg}`);
     await throwErrorWithComment(errorMsg, 'getBaseVersion-beta', pr);
   }
 
-  // 检查是否有对应基础号的 Alpha 版本（确保功能经过了 Alpha 测试）
-  if (alphaVersion && currentBetaVersion) {
-    const betaBaseVersion = getBaseVersionString(currentBetaVersion);
-    const alphaBaseVersion = getBaseVersionString(alphaVersion);
+  const currentBetaVersion = await versionManager.getLatestVersion('beta');
+  const mainVersion = await versionManager.getLatestVersion('main');
+  const mainBaseVersion = mainVersion ? getBaseVersionString(mainVersion) : '0.0.0';
 
-    if (betaBaseVersion !== alphaBaseVersion) {
-      const errorMsg = `Beta 版本基础号 (${betaBaseVersion}) 与 Alpha 版本基础号 (${alphaBaseVersion}) 不匹配，说明该功能未经过完整的 Alpha 测试流程`;
-      logger.error(`❌ ${errorMsg}`);
-      await throwErrorWithComment(errorMsg, 'getBaseVersion-beta', pr);
-    }
+  if (!currentBetaVersion) {
+    // 没有 Beta 版本，基于 Main 分支版本开始
+    const baseVersion = mainVersion || createDefaultVersion('BASE');
+    logger.info(`📌 Beta 分支基础版本: ${baseVersion} (无 Beta 版本，基于 Main 版本)`);
+    return baseVersion;
   }
 
-  logger.info(`📌 Beta 分支基础版本: ${currentBetaVersion} (非 Alpha 源分支，递增 Beta 版本)`);
+  // 比较 Beta 基础号和 Main 版本
+  const betaBaseVersion = getBaseVersionString(currentBetaVersion);
+
+  if (betaBaseVersion === mainBaseVersion) {
+    // Beta 基础号与 Main 一致，说明是新功能要进入 Beta 测试
+    logger.info(
+      `📌 Beta 分支基础版本: ${mainVersion || createDefaultVersion('BASE')} (Beta 基础号与 Main 一致，准备新功能测试)`,
+    );
+    return mainVersion || createDefaultVersion('BASE');
+  }
+  // Beta 基础号与 Main 不一致，说明已有新功能在 Beta 测试
+  logger.info(`📌 Beta 分支基础版本: ${currentBetaVersion} (Beta 基础号与 Main 不一致，已有功能在测试)`);
   return currentBetaVersion;
 }
 
@@ -634,22 +605,35 @@ async function getBetaBaseVersion(sourceBranch: string, pr: PRData | null): Prom
  * 获取 Main 分支基础版本
  */
 async function getMainBaseVersion(sourceBranch: string, pr: PRData | null): Promise<string | null> {
-  // Main 分支：只接受 Beta 分支来源
-  if (sourceBranch !== 'beta') {
-    const errorMsg = `Main 分支只接受来自 Beta 分支的合并，当前源分支: ${sourceBranch}`;
-    logger.error(`❌ ${errorMsg}`);
-    await throwErrorWithComment(errorMsg, 'getBaseVersion-main', pr);
+  // 场景 1: 来自 Beta - 正常发布流程
+  if (sourceBranch === 'beta') {
+    const betaVersion = await versionManager.getLatestVersion('beta');
+    if (!betaVersion) {
+      const errorMsg = 'Main 分支发布失败：没有可用的 Beta 版本。Main 分支只能用于发布已完成测试的 Beta 版本';
+      logger.error(`❌ ${errorMsg}`);
+      await throwErrorWithComment(errorMsg, 'getBaseVersion-main', pr);
+    }
+    logger.info(`📌 Main 分支基础版本: ${betaVersion} (来自 Beta，正常发布)`);
+    return betaVersion;
   }
 
-  const betaVersion = await versionManager.getLatestVersion('beta');
-  if (!betaVersion) {
-    const errorMsg = 'Main 分支发布失败：没有可用的 Beta 版本。Main 分支只能用于发布已完成测试的 Beta 版本';
-    logger.error(`❌ ${errorMsg}`);
-    await throwErrorWithComment(errorMsg, 'getBaseVersion-main', pr);
+  // 场景 2: 来自 Hotfix - 紧急修复流程
+  if (sourceBranch.startsWith('hotfix/')) {
+    const mainVersion = await versionManager.getLatestVersion('main');
+    if (!mainVersion) {
+      const errorMsg = 'Hotfix 失败：Main 分支没有版本，无法进行紧急修复';
+      logger.error(`❌ ${errorMsg}`);
+      await throwErrorWithComment(errorMsg, 'getBaseVersion-main', pr);
+    }
+    logger.info(`📌 Main 分支基础版本: ${mainVersion} (来自 Hotfix，紧急修复)`);
+    return mainVersion;
   }
 
-  logger.info(`📌 Main 分支基础版本: ${betaVersion} (基于 Beta 版本)`);
-  return betaVersion;
+  // 场景 3: 其他分支 - 不允许
+  const errorMsg = `Main 分支只接受来自 Beta 或 Hotfix 分支的合并，当前源分支: ${sourceBranch}`;
+  logger.error(`❌ ${errorMsg}`);
+  await throwErrorWithComment(errorMsg, 'getBaseVersion-main', pr);
+  return null; // throwErrorWithComment 会抛出错误，这里不会执行到
 }
 
 /**
@@ -661,8 +645,6 @@ export async function getBaseVersion(
   pr: PRData | null = null,
 ): Promise<string | null> {
   switch (targetBranch) {
-    case 'alpha':
-      return getAlphaBaseVersion(sourceBranch, pr);
     case 'beta':
       return getBetaBaseVersion(sourceBranch, pr);
     case 'main':

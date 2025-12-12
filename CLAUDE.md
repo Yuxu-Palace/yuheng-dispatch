@@ -58,12 +58,6 @@ This is a GitHub Action for automatic package version patching, designed to auto
 - Handles CHANGELOG file updates with proper formatting and insertion
 - Smart content processing (limits lines, formats consistently)
 
-**src/npm.ts** - NPM publishing functionality:
-- Automatic npm package publishing with branch-aware tagging
-- Registry configuration and authentication handling
-- Tag determination based on branch and version type (latest/beta/alpha)
-- Error handling with optional strict mode
-
 **src/utils.ts** - Utility functions and error handling:
 - `ActionError` class for structured error reporting
 - Version string manipulation and validation utilities
@@ -83,19 +77,17 @@ This is a GitHub Action for automatic package version patching, designed to auto
 
 ### Version Management Strategy
 
-The action implements a three-tier branching strategy:
+The action implements a two-tier branching strategy:
 
 1. **main branch** - Production releases (removes prerelease identifiers)
-2. **beta branch** - Pre-release versions with `-beta` suffix  
-3. **alpha branch** - Development versions with `-alpha` suffix
+2. **beta branch** - Pre-release versions with `-beta` suffix
 
 Version bumping behavior:
 - Uses semver library for version calculations
 - PR labels determine bump type: `major` → premajor, `minor` → preminor, `patch` → prepatch
-- **Alpha branch**: Adds `-alpha` prerelease identifier, upgrades existing alpha versions
-- **Beta branch**: Always increments to next `prerelease` with `-beta` identifier
-- **Main branch**: Removes prerelease identifiers, creates patch release
-- Automatic branch synchronization: main → beta, beta → alpha
+- **Beta branch**: Adds `-beta` prerelease identifier, upgrades existing beta versions based on labels
+- **Main branch**: Removes prerelease identifiers, creates production release
+- Automatic branch synchronization: main → beta
 - Complex conflict resolution: preserves higher version numbers during merges
 
 ### Workflow Execution Modes
@@ -110,7 +102,6 @@ Version bumping behavior:
 - Triggered when PR is closed and merged
 - Updates package.json version and creates git tags
 - Generates/updates CHANGELOG.md based on PR information
-- Publishes to npm if enabled
 - Synchronizes versions to downstream branches
 - Handles merge conflicts with automatic issue creation
 
@@ -137,7 +128,6 @@ Development dependencies:
 
 Located in `action.yaml`:
 - Requires `token` input (GitHub token for repository operations)
-- Optional NPM publishing configuration (token, registry, access, tag)
 - Configurable version prefixes, git user info, and supported branches
 - Runs on Node.js 20, executes built dist/index.cjs file
 
@@ -152,7 +142,7 @@ Workflow configuration in `.github/workflows/version-patch.yml`:
 2. **Code Quality**: Pre-commit hooks automatically format and lint code
 3. **Build**: Action is automatically built and dist/ is staged on commit
 4. **Testing**: No automated test framework configured - test by creating PRs
-5. **Branch Strategy**: Follow alpha → beta → main promotion workflow
+5. **Branch Strategy**: Follow beta → main promotion workflow
 
 ALWAYS prefer editing an existing file to creating a new one.
 NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
