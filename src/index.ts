@@ -31,7 +31,7 @@ async function handleExecutionMode(
 /**
  * 验证事件类型并提取 PR 信息
  */
-function validateAndExtractPRInfo(): PRWorkflowInfo {
+function validateAndExtractPRInfo(): PRWorkflowInfo | null {
   if (context.eventName !== 'pull_request' && context.eventName !== 'pull_request_target') {
     throw new ActionError(`只支持 pull_request 事件，当前事件: ${context.eventName}`, 'validateEvent');
   }
@@ -45,9 +45,10 @@ function validateAndExtractPRInfo(): PRWorkflowInfo {
   const sourceBranch = prPayload.head.ref;
   const prNumber = prPayload.number;
 
-  // 类型守卫：确保 targetBranch 是支持的分支类型
+  // 类型守卫：确保 targetBranch 是支持的分支类型；不支持时直接跳过而非抛错
   if (!isSupportedBranch(targetBranch)) {
-    throw new ActionError(`不支持的分支: ${targetBranch}，跳过版本管理`, 'validateBranch');
+    logger.info(`不支持的分支: ${targetBranch}，跳过版本管理`);
+    return null;
   }
 
   const pr = prPayload as PRData;
@@ -225,6 +226,14 @@ async function run(): Promise<void> {
   try {
     // 1. 验证事件并提取 PR 信息
     const workflowInfo = validateAndExtractPRInfo();
+    if (!workflowInfo) {
+      // 不支持的分支：直接跳过，设置空输出以保持一致
+      setOutput('preview-version', '');
+      setOutput('next-version', '');
+      setOutput('pkg-pr-new-url', '');
+      setOutput('is-preview', 'true');
+      return;
+    }
 
     // 2. 打印调试信息
     printDebugInfo(workflowInfo);
