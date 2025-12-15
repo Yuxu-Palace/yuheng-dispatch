@@ -62,16 +62,43 @@ export const LABEL_TO_CHANGELOG_TYPE: Record<string, string> = {
 /** 评论模板 */
 export const COMMENT_TEMPLATES = {
   /** 版本管理评论模板 */
-  VERSION_PREVIEW: (data: VersionPreviewData) => `## ${COMMENT_CONFIG.TITLE}
+  VERSION_PREVIEW: (data: VersionPreviewData) => {
+    let body = `## ${COMMENT_CONFIG.TITLE}
 
 | 项目 | 值 |
 |------|-----|
 | **源分支** | \`${data.sourceBranch}\` |
 | **目标分支** | \`${data.targetBranch}\` |
 | **当前版本** | \`${data.currentVersion || '无'}\` |
-| **下一版本** | \`${data.nextVersion}\` |
+| **下一版本** | \`${data.nextVersion}\` |`;
 
-> ℹ️ 这是预览模式，合并 PR 后将自动创建 tag 并更新版本。`,
+    if (data.pkgPrNewUrl) {
+      body += `
+
+### 📦 预览包
+
+使用以下命令安装预览版本：
+
+\`\`\`bash
+# npm
+npm install ${data.pkgPrNewUrl}
+
+# pnpm
+pnpm add ${data.pkgPrNewUrl}
+
+# yarn
+yarn add ${data.pkgPrNewUrl}
+\`\`\`
+
+> 💡 预览包 URL: ${data.pkgPrNewUrl}`;
+    }
+
+    body += `
+
+> ℹ️ 这是预览模式，合并 PR 后将自动创建 tag 并更新版本。`;
+
+    return body;
+  },
 
   /** 错误评论模板 */
   ERROR: (errorMessage: string) => `## ${COMMENT_CONFIG.TITLE}
