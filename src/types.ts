@@ -22,7 +22,6 @@ export interface VersionPreviewData {
   targetBranch: SupportedBranch;
   currentVersion?: string;
   nextVersion: string;
-  pkgPrNewUrl?: string;
 }
 
 // ==================== 工具函数类型 ====================

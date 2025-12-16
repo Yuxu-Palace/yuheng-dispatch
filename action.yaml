@@ -40,11 +40,6 @@ inputs:
     description: Title for PR comments (e.g., '📦 版本管理', 'Version Management')
     required: false
     default: '📦 版本管理'
-  
-  enable-pkg-pr-new:
-    description: Enable pkg.pr.new preview package publishing
-    required: false
-    default: 'false'
 
 outputs:
   next-version:
@@ -55,9 +50,6 @@ outputs:
   
   is-preview:
     description: Whether this was a preview run (true/false)
-  
-  pkg-pr-new-url:
-    description: The pkg.pr.new preview package URL (execution mode)
 
 runs:
   using: node20

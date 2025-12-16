@@ -18,16 +18,16 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: pnpm
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - name: Install dependencies
         run: pnpm install
@@ -46,7 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     # 🎯 简化条件：预览模式（有标签） + 执行模式（PR合并）
     if: |
-      !contains(github.event.head_commit.message, '[skip ci]') && 
+      !contains(github.event.head_commit.message, '[skip ci]') &&
       github.event_name == 'pull_request' && (
         (github.event.action != 'closed' && github.event.pull_request.labels.*) ||
         (github.event.action == 'closed' && github.event.pull_request.merged == true)
@@ -63,15 +63,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 10
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
 
       - name: Download publish artifact
         uses: actions/download-artifact@v4
@@ -84,7 +84,7 @@ jobs:
         uses: ./
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          
+
           # 版本管理配置
           version-prefix: 'v'  # 版本标签前缀，如 v1.0.0
           git-user-name: 'cmtlyt'  # Git 提交时的用户名

@@ -1,8 +1,7 @@
 import process from 'node:process';
 import { context } from '@actions/github';
-import { getBooleanInput, logger, setFailed, setOutput } from './core';
+import { logger, setFailed, setOutput } from './core';
 import { configureGitUser, syncBranches, updateVersionAndCreateTag } from './git';
-import { publishToPkgPrNew } from './pkg-pr-new';
 import { createErrorComment, getCurrentPRNumber, handlePreviewMode } from './pr';
 import type { PRData, PRWorkflowInfo, SupportedBranch } from './types';
 import { ActionError, isSupportedBranch } from './utils';
@@ -126,12 +125,10 @@ async function runPreviewWorkflow(
   info: PRWorkflowInfo,
   baseVersion: string | null,
   newVersion: string | null,
-  enablePkgPrNew: boolean,
 ): Promise<void> {
   logger.info('📝 执行预览模式...');
-  await handlePreviewMode(info.pr, info.sourceBranch, info.targetBranch, baseVersion, newVersion, enablePkgPrNew);
+  await handlePreviewMode(info.pr, info.sourceBranch, info.targetBranch, baseVersion, newVersion);
   setOutput('preview-version', newVersion || '');
-  setOutput('pkg-pr-new-url', '');
   setOutput('is-preview', 'true');
 }
 
@@ -142,7 +139,6 @@ async function runExecutionWorkflow(
   info: PRWorkflowInfo,
   baseVersion: string | null,
   newVersion: string | null,
-  enablePkgPrNew: boolean,
 ): Promise<void> {
   logger.info('🚀 执行版本更新模式...');
 
@@ -150,24 +146,12 @@ async function runExecutionWorkflow(
     logger.info(
       `ℹ️ 无需版本升级 - 合并方向: ${info.sourceBranch} → ${info.targetBranch}, 当前版本: ${baseVersion || '无'}`,
     );
-    setOutput('pkg-pr-new-url', '');
     setOutput('next-version', '');
     setOutput('is-preview', 'false');
     return;
   }
 
   await handleExecutionMode(newVersion, info.targetBranch, info.pr);
-  if (enablePkgPrNew) {
-    const pkgPrNewResult = await publishToPkgPrNew(newVersion, enablePkgPrNew);
-    if (pkgPrNewResult.success && pkgPrNewResult.url) {
-      setOutput('pkg-pr-new-url', pkgPrNewResult.url);
-      logger.info(`✅ pkg.pr.new 预览包已发布: ${pkgPrNewResult.url}`);
-    } else {
-      setOutput('pkg-pr-new-url', '');
-    }
-  } else {
-    setOutput('pkg-pr-new-url', '');
-  }
   setOutput('next-version', newVersion);
   setOutput('is-preview', 'false');
   logger.info(`✅ 版本更新完成: ${newVersion}`);
@@ -181,12 +165,11 @@ async function executeWorkflow(
   baseVersion: string | null,
   newVersion: string | null,
 ): Promise<void> {
-  const enablePkgPrNew = getBooleanInput('enable-pkg-pr-new');
   if (info.isDryRun) {
-    await runPreviewWorkflow(info, baseVersion, newVersion, enablePkgPrNew);
+    await runPreviewWorkflow(info, baseVersion, newVersion);
     return;
   }
-  await runExecutionWorkflow(info, baseVersion, newVersion, enablePkgPrNew);
+  await runExecutionWorkflow(info, baseVersion, newVersion);
 }
 
 /**
@@ -230,7 +213,6 @@ async function run(): Promise<void> {
       // 不支持的分支：直接跳过，设置空输出以保持一致
       setOutput('preview-version', '');
       setOutput('next-version', '');
-      setOutput('pkg-pr-new-url', '');
       setOutput('is-preview', 'true');
       return;
     }

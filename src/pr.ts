@@ -1,7 +1,6 @@
 import { context, getOctokit } from '@actions/github';
 import { COMMENT_CONFIG, COMMENT_TEMPLATES } from './constants';
 import { getInput, logger } from './core';
-import { type PkgPrNewResult, publishToPkgPrNew } from './pkg-pr-new';
 import type { IssueComment, PRData, SupportedBranch, VersionPreviewData } from './types';
 
 // ==================== GitHub API 客户端 ====================
@@ -93,17 +92,11 @@ export async function handlePreviewMode(
   targetBranch: SupportedBranch,
   baseVersion: string | null,
   newVersion: string | null,
-  enablePkgPrNew = false,
 ): Promise<void> {
   const prNumber = getCurrentPRNumber(pr);
   if (!prNumber) {
     logger.warning('无法获取 PR 号，跳过评论更新');
     return;
-  }
-
-  let pkgPrNewResult: PkgPrNewResult | null = null;
-  if (enablePkgPrNew && newVersion) {
-    pkgPrNewResult = await publishToPkgPrNew(newVersion, enablePkgPrNew);
   }
 
   // 构建版本预览数据
@@ -112,7 +105,6 @@ export async function handlePreviewMode(
     targetBranch,
     currentVersion: baseVersion || undefined,
     nextVersion: newVersion || '无需升级',
-    pkgPrNewUrl: pkgPrNewResult?.url,
   };
 
   // 根据是否有新版本选择合适的模板

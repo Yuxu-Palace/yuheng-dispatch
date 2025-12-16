@@ -12,7 +12,7 @@
 - **📝 CHANGELOG 生成**：基于 PR 信息自动生成变更日志
 - **🔗 分支同步**：自动同步版本到下游分支，智能冲突解决
 - **💬 PR 评论**：实时预览版本变更，提供详细的版本信息
-- **📦 预览包（可选）**：集成 pkg.pr.new，为 PR 提供可安装的预览包
+- **📦 预览包（可选）**：可通过独立工作流集成 pkg.pr.new 预览包发布
 
 ## 📋 版本管理规则
 
@@ -79,7 +79,6 @@ jobs:
           version-prefix: 'v'
           supported-branches: 'main,beta'
           enable-changelog: 'true'
-          # enable-pkg-pr-new: 'true' # 可选：开启 pkg.pr.new 预览包
 ```
 
 ### 2. PR 标签配置
@@ -118,12 +117,66 @@ git checkout -b feature/new-api beta
 # - 同步代码到 beta 分支
 ```
 
-## 🧪 预览包 (pkg.pr.new)
+## 🧪 集成 pkg.pr.new 预览包（可选）
 
-- 可选功能，默认关闭；通过输入参数 `enable-pkg-pr-new: 'true'` 启用。
-- 预览模式（PR 打开/更新/关闭）：生成预览包并在 PR 评论中附上安装命令。
-- 执行模式（合并后）：在创建 tag 后发布对应版本的预览包，并通过输出 `pkg-pr-new-url` 暴露链接。
-- 发布失败只会记录警告，不会阻断版本管理流程。
+如需为 PR 提供可安装的预览包，可在工作流中添加独立的 `pkg-preview` 任务：
+
+### 完整配置示例
+
+```yaml
+name: 版本管理
+
+on:
+  pull_request:
+    branches: [main, beta]
+    types: [opened, synchronize, reopened, labeled, unlabeled, closed]
+
+jobs:
+  version-management:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 版本管理
+        uses: Yuxu-Palace/yuheng-dispatch@main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  # 可选：添加预览包发布任务
+  pkg-preview:
+    if: github.event.pull_request.merged == false && github.event.action != 'closed'
+    needs: version-management
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: 发布预览包
+        run: pnpm dlx pkg-pr-new publish
+```
+
+### 特性说明
+
+- **职责分离**：版本管理和包发布独立运行，互不影响
+- **按需触发**：仅在 PR 未合并时运行，避免资源浪费
+- **灵活控制**：可自定义触发条件（如仅在 review approved 后）
+- **官方最佳实践**：符合 pkg.pr.new 推荐的使用方式
+
+详细配置参见项目的 [.github/workflows/version-patch.yml](.github/workflows/version-patch.yml) 文件。
 
 ## 💬 PR 评论输出
 
@@ -144,20 +197,6 @@ Action 会在 PR 中自动创建评论，显示版本管理信息：
 
 > ℹ️ 这是预览模式，合并 PR 后将自动创建 tag 并更新版本。
 ```
-
-启用 `enable-pkg-pr-new: 'true'` 且发布成功时，会在评论中追加预览包安装命令：
-
-### 📦 预览包
-
-使用以下命令安装预览版本：
-
-```bash
-npm install https://pkg.pr.new/<preview-url>
-pnpm add https://pkg.pr.new/<preview-url>
-yarn add https://pkg.pr.new/<preview-url>
-```
-
-> 💡 预览包 URL: https://pkg.pr.new/<preview-url>
 
 ### 跳过处理评论
 当 PR 无需版本升级时：
@@ -200,7 +239,6 @@ Beta 分支需要 PR 标签（major/minor/patch）来确定版本升级类型。
 | `supported-branches` | 支持的分支列表 | ❌ | `main,beta` |
 | `enable-changelog` | 启用 CHANGELOG 生成 | ❌ | `true` |
 | `comment-title` | PR 评论标题 | ❌ | `📦 版本管理` |
-| `enable-pkg-pr-new` | 启用 pkg.pr.new 预览包发布 | ❌ | `false` |
 
 ### 输出参数
 
@@ -209,7 +247,6 @@ Beta 分支需要 PR 标签（major/minor/patch）来确定版本升级类型。
 | `next-version` | 计算出的新版本号 |
 | `preview-version` | 预览版本号 |
 | `is-preview` | 是否为预览模式 |
-| `pkg-pr-new-url` | 执行模式下生成的 pkg.pr.new 预览包链接 |
 
 ## 🔧 高级配置
 
