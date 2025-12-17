@@ -1,17 +1,18 @@
 import { readPackageJSON, resolvePackageJSON, writePackageJSON } from 'pkg-types';
 import semver, { type ReleaseType } from 'semver';
-import { DEFAULT_VERSIONS } from './constants';
-import { logger } from './core';
-import { createErrorComment, getCurrentPRNumber } from './pr';
-import type { PRData, SupportedBranch, VersionSummary } from './types';
+import { logger } from '../../github/actions';
+import { createErrorComment, getCurrentPRNumber } from '../../github/pr';
 import {
   ActionError,
   addVersionPrefix,
   cleanVersion,
   execGitWithOutput,
   getVersionPrefix,
+  hasVersionPrefix,
   normalizeVersion,
-} from './utils';
+} from '../../utils';
+import { DEFAULT_VERSIONS } from '../../utils/constants';
+import type { PRData, SupportedBranch, VersionSummary } from '../../utils/types';
 
 // ==================== 版本管理辅助函数 ====================
 
@@ -63,14 +64,6 @@ export function getReleaseTypeFromLabels(labels: { name: string }[] = []): Relea
   }
 
   return null;
-}
-
-/**
- * 检查字符串是否有版本前缀
- */
-export function hasVersionPrefix(version: string): boolean {
-  const prefix = getVersionPrefix();
-  return version.startsWith(prefix);
 }
 
 /**

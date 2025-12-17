@@ -10,13 +10,6 @@ export type IssueComment = Awaited<
   ReturnType<ReturnType<typeof getOctokit>['rest']['issues']['listComments']>
 >['data'][number];
 
-export interface VersionInfo {
-  current: string;
-  beta: string;
-  currentTag: string | null;
-  betaTag: string | null;
-}
-
 export interface VersionPreviewData {
   sourceBranch: string;
   targetBranch: SupportedBranch;

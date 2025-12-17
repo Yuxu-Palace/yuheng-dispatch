@@ -1,11 +1,11 @@
 import process from 'node:process';
 import { context } from '@actions/github';
-import { logger, setFailed, setOutput } from './core';
-import { configureGitUser, syncBranches, updateVersionAndCreateTag } from './git';
-import { createErrorComment, getCurrentPRNumber, handlePreviewMode } from './pr';
-import type { PRData, PRWorkflowInfo, SupportedBranch } from './types';
+import { configureGitUser, syncBranches, updateVersionAndCreateTag } from './core/git';
+import { calculateNewVersion, getBaseVersion } from './core/version';
+import { logger, setFailed, setOutput } from './github/actions';
+import { createErrorComment, getCurrentPRNumber, handlePreviewMode } from './github/pr';
 import { ActionError, isSupportedBranch } from './utils';
-import { calculateNewVersion, getBaseVersion } from './version';
+import type { PRData, PRWorkflowInfo, SupportedBranch } from './utils/types';
 
 // ==================== 主执行函数 ====================
 

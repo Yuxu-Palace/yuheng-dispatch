@@ -456,26 +456,6 @@
   },
   "overrides": [
     {
-      "includes": ["**/tests/**"],
-      "linter": {
-        "rules": {
-          "complexity": {
-            "noExcessiveLinesPerFunction": "off"
-          },
-          "correctness": {
-            "noPrivateImports": "off"
-          },
-          "suspicious": {
-            "noEmptyBlockStatements": "off",
-            "noConstantBinaryExpressions": "off"
-          },
-          "style": {
-            "useNamingConvention": "off"
-          }
-        }
-      }
-    },
-    {
       "includes": ["./*"],
       "linter": {
         "rules": {

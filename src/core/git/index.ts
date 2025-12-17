@@ -1,10 +1,10 @@
 import { context } from '@actions/github';
-import { commitChangelog, hasChangelogChanges, updateChangelog } from './changelog';
-import { COMMIT_TEMPLATES, GIT_USER_CONFIG } from './constants';
-import { logger } from './core';
-import type { BranchSyncResult, PRData, SupportedBranch } from './types';
-import { ActionError, execGit, versionParse } from './utils';
-import { updatePackageVersion } from './version';
+import { logger } from '../../github/actions';
+import { ActionError, execGit, versionParse } from '../../utils';
+import { COMMIT_TEMPLATES, GIT_USER_CONFIG, RETRY_CONFIG } from '../../utils/constants';
+import type { BranchSyncResult, PRData, SupportedBranch } from '../../utils/types';
+import { commitChangelog, hasChangelogChanges, updateChangelog } from '../changelog';
+import { updatePackageVersion } from '../version';
 
 // ==================== Git 基础操作 ====================
 
@@ -44,7 +44,11 @@ export async function commitAndPushVersion(version: string, targetBranch: Suppor
 /**
  * 安全推送，处理并发冲突
  */
-async function safePushWithRetry(targetBranch: SupportedBranch, version: string, maxRetries = 3): Promise<void> {
+async function safePushWithRetry(
+  targetBranch: SupportedBranch,
+  version: string,
+  maxRetries = RETRY_CONFIG.MAX_ATTEMPTS,
+): Promise<void> {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       if (attempt > 1) {
@@ -69,7 +73,7 @@ async function safePushWithRetry(targetBranch: SupportedBranch, version: string,
       logger.warning(`⚠️ 推送失败 (第${attempt}/${maxRetries}次)，可能存在并发冲突: ${error}`);
 
       // 等待随机时间避免竞态
-      const delay = Math.random() * 2000 + 1000; // 1-3秒随机延迟
+      const delay = Math.random() * (RETRY_CONFIG.DELAY_MAX_MS - RETRY_CONFIG.DELAY_MIN_MS) + RETRY_CONFIG.DELAY_MIN_MS;
       logger.info(`⏳ 等待 ${Math.round(delay)}ms 后重试...`);
       await new Promise((resolve) => setTimeout(resolve, delay));
     }

@@ -1,7 +1,7 @@
 import { context, getOctokit } from '@actions/github';
-import { COMMENT_CONFIG, COMMENT_TEMPLATES } from './constants';
-import { getInput, logger } from './core';
-import type { IssueComment, PRData, SupportedBranch, VersionPreviewData } from './types';
+import { COMMENT_CONFIG, COMMENT_TEMPLATES, PAGINATION_CONFIG } from '../../utils/constants';
+import type { IssueComment, PRData, SupportedBranch, VersionPreviewData } from '../../utils/types';
+import { getInput, logger } from '../actions';
 
 // ==================== GitHub API 客户端 ====================
 
@@ -38,7 +38,7 @@ export async function updatePRComment(
       // biome-ignore lint/style/useNamingConvention: GitHub API requires this property name
       issue_number: prNumber,
       // biome-ignore lint/style/useNamingConvention: GitHub API requires this property name
-      per_page: 100,
+      per_page: PAGINATION_CONFIG.COMMENTS_PER_PAGE,
     })) {
       existingComment = comments.find((comment) => comment.user?.type === 'Bot' && comment.body?.includes(identifier));
 

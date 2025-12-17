@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import { exec } from '@actions/exec';
+import { logger } from '../github/actions';
 import { GIT_USER_CONFIG, SUPPORTED_BRANCHES, VERSION_PREFIX_CONFIG } from './constants';
-import { logger } from './core';
 import type { SupportedBranch } from './types';
 
 // ==================== 版本处理工具函数 ====================
@@ -41,29 +41,16 @@ export function versionParse(version: string): VersionParseResult {
   const prefix = VERSION_PREFIX_CONFIG.CURRENT;
   const supportedPrefixes = VERSION_PREFIX_CONFIG.SUPPORTED;
 
-  // 检查是否有当前前缀
-  const hasCurrentPrefix = version.startsWith(prefix);
+  // 查找匹配的前缀（按长度从长到短，避免误匹配）
+  let foundPrefix = '';
+  let clean = version;
 
-  let clean: string;
-
-  if (hasCurrentPrefix) {
-    // 如果有当前前缀，直接去除
-    clean = version.slice(prefix.length);
-  } else {
-    // 检查其他支持的前缀
-    let foundPrefix = false;
-    let extractedClean = '';
-    for (let i = 0; i < supportedPrefixes.length; i++) {
-      const supportedPrefix = supportedPrefixes[i];
-      if (version.startsWith(supportedPrefix)) {
-        extractedClean = version.slice(supportedPrefix.length);
-        foundPrefix = true;
-        break;
-      }
+  for (const supportedPrefix of supportedPrefixes) {
+    if (version.startsWith(supportedPrefix)) {
+      foundPrefix = supportedPrefix;
+      clean = version.slice(supportedPrefix.length);
+      break;
     }
-
-    // 如果没有找到任何前缀，直接使用原版本
-    clean = foundPrefix ? extractedClean : version;
   }
 
   const result: VersionParseResult = {
@@ -71,31 +58,14 @@ export function versionParse(version: string): VersionParseResult {
     pkgVersion: clean,
     targetVersion: `${prefix}${clean}`,
     prefix,
-    hasPrefix: version !== clean, // 任何前缀（包括非当前前缀）
-    hasCurrentPrefix,
+    hasPrefix: foundPrefix !== '', // 找到任何前缀
+    hasCurrentPrefix: foundPrefix === prefix, // 找到的前缀是当前配置的前缀
   };
 
   // 存入缓存
   versionParseCache.set(version, result);
 
   return result;
-}
-
-/**
- * 获取版本解析缓存统计信息
- */
-export function getVersionParseCacheStats(): { size: number; hitRate: number } {
-  return {
-    size: versionParseCache.size,
-    hitRate: 0, // 可以后续扩展统计命中率
-  };
-}
-
-/**
- * 清理版本解析缓存
- */
-export function clearVersionParseCache(): void {
-  versionParseCache.clear();
 }
 
 /**

@@ -1,14 +1,28 @@
-import { getInput } from './core';
+import { getInput, logger } from '../github/actions';
 import type { VersionPreviewData } from './types';
 
 // ==================== 配置常量 ====================
 
-export const SUPPORTED_BRANCHES = getInput('supported-branches')
-  ?.split(',')
-  .map((branch) => branch.trim()) || ['main', 'beta'];
+export const SUPPORTED_BRANCHES = (() => {
+  const input = getInput('supported-branches');
+  // 检查是否有有效输入（非空字符串）
+  if (input && input.trim()) {
+    return input.split(',').map((branch) => branch.trim());
+  }
+  // 默认支持的分支
+  return ['main', 'beta'];
+})();
 
-/** 支持的前缀列表（用于兼容性处理） */
-const SUPPORTED_PREFIXES = ['v', 'version-', 'ver-', 'rel-'] as const;
+/** 支持的前缀列表（按长度从长到短排序，避免短前缀误匹配） */
+const SUPPORTED_PREFIXES = ['version-', 'ver-', 'rel-', 'v'] as const;
+
+/** 支持的前缀类型 */
+type SupportedPrefix = (typeof SUPPORTED_PREFIXES)[number];
+
+/** 类型守卫：检查是否为支持的前缀 */
+function isSupportedPrefix(prefix: string): prefix is SupportedPrefix {
+  return SUPPORTED_PREFIXES.includes(prefix as SupportedPrefix);
+}
 
 /** 版本前缀配置 */
 export const VERSION_PREFIX_CONFIG = {
@@ -18,7 +32,13 @@ export const VERSION_PREFIX_CONFIG = {
     if (!customPrefix) {
       return 'v';
     }
-    return SUPPORTED_PREFIXES.includes(customPrefix as any) ? customPrefix : 'v';
+
+    if (isSupportedPrefix(customPrefix)) {
+      return customPrefix;
+    }
+
+    logger.warning(`不支持的版本前缀 "${customPrefix}"，使用默认值 "v"`);
+    return 'v';
   })(),
   /** 支持的前缀列表（用于兼容性处理） */
   SUPPORTED: SUPPORTED_PREFIXES,
@@ -121,4 +141,30 @@ export const COMMIT_TEMPLATES = {
   SYNC_MAIN_TO_BETA: (version: string) => `chore: sync main v${version} to beta [skip ci]`,
   FORCE_SYNC: (version: string) => `chore: force sync from main v${version} [skip ci]`,
   CHANGELOG_UPDATE: (version: string) => `docs: update CHANGELOG for ${version}`,
+} as const;
+
+// ==================== 操作配置常量 ====================
+
+/** Git 重试配置 */
+export const RETRY_CONFIG = {
+  /** 最大重试次数 */
+  MAX_ATTEMPTS: 3,
+  /** 最小延迟时间(毫秒) */
+  DELAY_MIN_MS: 1000,
+  /** 最大延迟时间(毫秒) */
+  DELAY_MAX_MS: 3000,
+} as const;
+
+/** CHANGELOG 配置 */
+export const CHANGELOG_CONFIG = {
+  /** 每个section最多显示的行数 */
+  MAX_LINES_PER_SECTION: 5,
+  /** 预览显示的行数 */
+  PREVIEW_LINES: 15,
+} as const;
+
+/** 分页配置 */
+export const PAGINATION_CONFIG = {
+  /** 每页评论数量 */
+  COMMENTS_PER_PAGE: 100,
 } as const;
