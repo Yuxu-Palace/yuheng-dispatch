@@ -1,7 +1,7 @@
 import { context } from '@actions/github';
 import { logger } from '../../github/actions';
 import { ActionError, execGit, versionParse } from '../../utils';
-import { COMMIT_TEMPLATES, GIT_USER_CONFIG, RETRY_CONFIG } from '../../utils/constants';
+import { COMMIT_TEMPLATES, GIT_USER_CONFIG, RETRY_CONFIG, VERSION_PREFIX_CONFIG } from '../../utils/constants';
 import type { BranchSyncResult, PRData, SupportedBranch } from '../../utils/types';
 import { commitChangelog, hasChangelogChanges, updateChangelog } from '../changelog';
 import { updatePackageVersion } from '../version';
@@ -105,10 +105,12 @@ function isAutoSyncCommit(): boolean {
  * 获取同步提交消息
  */
 function getCommitMessage(sourceBranch: SupportedBranch, targetBranch: SupportedBranch, version: string): string {
+  const cleanVersion = versionParse(version).pkgVersion;
+  const prefix = VERSION_PREFIX_CONFIG.CURRENT;
   if (sourceBranch === 'main' && targetBranch === 'beta') {
-    return COMMIT_TEMPLATES.SYNC_MAIN_TO_BETA(version);
+    return COMMIT_TEMPLATES.SYNC_MAIN_TO_BETA(cleanVersion);
   }
-  return `chore: sync ${sourceBranch} v${version} to ${targetBranch} [skip ci]`;
+  return `chore: sync ${sourceBranch} ${prefix}${cleanVersion} to ${targetBranch} [skip ci]`;
 }
 
 /**

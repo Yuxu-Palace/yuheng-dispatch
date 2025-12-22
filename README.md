@@ -77,7 +77,6 @@ jobs:
 
           # 版本管理配置
           version-prefix: 'v'
-          supported-branches: 'main,beta'
           enable-changelog: 'true'
 ```
 
@@ -236,7 +235,6 @@ Beta 分支需要 PR 标签（major/minor/patch）来确定版本升级类型。
 | `version-prefix` | 版本标签前缀 | ❌ | `v` |
 | `git-user-name` | Git 提交用户名 | ❌ | `GitHub Action` |
 | `git-user-email` | Git 提交邮箱 | ❌ | `action@github.com` |
-| `supported-branches` | 支持的分支列表 | ❌ | `main,beta` |
 | `enable-changelog` | 启用 CHANGELOG 生成 | ❌ | `true` |
 | `comment-title` | PR 评论标题 | ❌ | `📦 版本管理` |
 
@@ -256,11 +254,6 @@ Beta 分支需要 PR 标签（major/minor/patch）来确定版本升级类型。
 version-prefix: 'rel-'  # 生成标签：rel-1.0.0
 ```
 
-### 多分支支持
-
-```yaml
-supported-branches: 'main,beta,staging'
-```
 
 ## 📚 工作流程图
 

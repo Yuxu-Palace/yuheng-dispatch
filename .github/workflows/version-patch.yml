@@ -7,67 +7,12 @@ on:
     types: [opened, synchronize, reopened, labeled, unlabeled, closed]
 
 jobs:
-  # 代码检查 Job
-  lint:
-    name: Code Quality Check
+  # 代码质量检查、类型验证和构建
+  validate-and-build:
+    name: Quality Check & Build
     runs-on: ubuntu-latest
-    # 所有PR事件都运行代码检查
+    # 所有PR活跃事件 + PR合并事件时运行
     if: github.event.action != 'closed' || github.event.pull_request.merged == true
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install
-
-      - name: Run Biome check
-        run: pnpm check
-
-  # 类型检查 Job
-  type-check:
-    name: TypeScript Type Check
-    runs-on: ubuntu-latest
-    # 所有PR事件都运行类型检查
-    if: github.event.action != 'closed' || github.event.pull_request.merged == true
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install
-
-      - name: Type check
-        run: pnpm exec tsc --noEmit
-
-  build:
-    # 仅在非关闭，或已合并的关闭事件时运行
-    if: github.event.action != 'closed' || github.event.pull_request.merged == true
-    runs-on: ubuntu-latest
-    needs: [lint, type-check]  # 依赖于代码检查和类型验证
 
     steps:
       - name: Checkout
@@ -89,6 +34,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      - name: Run Biome check
+        run: pnpm check
+
+      - name: TypeScript type check
+        run: pnpm exec tsc --noEmit
+
       - name: Build
         run: pnpm run build
 
@@ -108,7 +59,7 @@ jobs:
         (github.event.action != 'closed' && github.event.pull_request.labels.*) ||
         (github.event.action == 'closed' && github.event.pull_request.merged == true)
       )
-    needs: build
+    needs: validate-and-build
     permissions:
       contents: write
       issues: write
@@ -146,6 +97,5 @@ jobs:
           version-prefix: 'v'  # 版本标签前缀，如 v1.0.0
           git-user-name: 'cmtlyt'  # Git 提交时的用户名
           git-user-email: 'cmtlyt@163.com'  # Git 提交时的邮箱
-          supported-branches: 'main,beta'  # 支持版本管理的分支列表
           enable-changelog: 'true'  # 自动生成和更新 CHANGELOG.md
           comment-title: '📦 版本管理'  # PR 评论中显示的标题

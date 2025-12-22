@@ -127,7 +127,7 @@ export async function updateChangelog(pr: PRData | null = null, version = ''): P
     logger.info('开始生成基于 PR 的 CHANGELOG...');
 
     const currentDate = new Date().toISOString().split('T')[0];
-    const versionTag = version.startsWith('v') ? version : `v${version}`;
+    const versionTag = addVersionPrefix(version);
 
     // 生成基于 PR 的 CHANGELOG 条目
     const changelogEntry = await generateChangelogFromPR(pr, version);

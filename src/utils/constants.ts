@@ -3,15 +3,7 @@ import type { VersionPreviewData } from './types';
 
 // ==================== 配置常量 ====================
 
-export const SUPPORTED_BRANCHES = (() => {
-  const input = getInput('supported-branches');
-  // 检查是否有有效输入（非空字符串）
-  if (input && input.trim()) {
-    return input.split(',').map((branch) => branch.trim());
-  }
-  // 默认支持的分支
-  return ['main', 'beta'];
-})();
+export const SUPPORTED_BRANCHES = ['main', 'beta'];
 
 /** 支持的前缀列表（按长度从长到短排序，避免短前缀误匹配） */
 const SUPPORTED_PREFIXES = ['version-', 'ver-', 'rel-', 'v'] as const;
@@ -138,8 +130,8 @@ export const PR_SECTION_PATTERNS = [
 /** 提交消息模板 */
 export const COMMIT_TEMPLATES = {
   VERSION_BUMP: (version: string, branch: string) => `chore: bump version to ${version} for ${branch}`,
-  SYNC_MAIN_TO_BETA: (version: string) => `chore: sync main v${version} to beta [skip ci]`,
-  FORCE_SYNC: (version: string) => `chore: force sync from main v${version} [skip ci]`,
+  SYNC_MAIN_TO_BETA: (version: string) => `chore: sync main ${version} to beta [skip ci]`,
+  FORCE_SYNC: (version: string) => `chore: force sync from main ${version} [skip ci]`,
   CHANGELOG_UPDATE: (version: string) => `docs: update CHANGELOG for ${version}`,
 } as const;
 

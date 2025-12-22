@@ -26,11 +26,6 @@ inputs:
     required: false
     default: 'action@github.com'
   
-  supported-branches:
-    description: Comma-separated list of supported branches
-    required: false
-    default: 'main,beta'
-  
   enable-changelog:
     description: Enable automatic CHANGELOG generation
     required: false
