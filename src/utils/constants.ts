@@ -1,5 +1,5 @@
-import { getInput, logger } from '../github/actions';
-import type { VersionPreviewData } from './types';
+import { getInput, logger } from '@/github/actions';
+import type { VersionPreviewData } from '@/utils/types';
 
 // ==================== 配置常量 ====================
 

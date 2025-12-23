@@ -1,14 +1,9 @@
 import * as fs from 'node:fs';
 import { exec } from '@actions/exec';
-import { getBooleanInput, logger } from '../../github/actions';
-import { addVersionPrefix, commitAndPushFile, hasFileChanges } from '../../utils';
-import {
-  CHANGELOG_CONFIG,
-  COMMIT_TEMPLATES,
-  LABEL_TO_CHANGELOG_TYPE,
-  PR_SECTION_PATTERNS,
-} from '../../utils/constants';
-import type { PRData, SupportedBranch } from '../../utils/types';
+import { getBooleanInput, logger } from '@/github/actions';
+import { addVersionPrefix, commitAndPushFile, hasFileChanges } from '@/utils';
+import { CHANGELOG_CONFIG, COMMIT_TEMPLATES, LABEL_TO_CHANGELOG_TYPE, PR_SECTION_PATTERNS } from '@/utils/constants';
+import type { PRData, SupportedBranch } from '@/utils/types';
 
 // ==================== CHANGELOG 操作 ====================
 

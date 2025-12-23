@@ -1,8 +1,8 @@
 import * as fs from 'node:fs';
 import { exec } from '@actions/exec';
-import { logger } from '../github/actions';
-import { GIT_USER_CONFIG, SUPPORTED_BRANCHES, VERSION_PREFIX_CONFIG } from './constants';
-import type { SupportedBranch } from './types';
+import { logger } from '@/github/actions';
+import { GIT_USER_CONFIG, SUPPORTED_BRANCHES, VERSION_PREFIX_CONFIG } from '@/utils/constants';
+import type { SupportedBranch } from '@/utils/types';
 
 // ==================== 版本处理工具函数 ====================
 

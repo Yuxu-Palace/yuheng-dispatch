@@ -28,8 +28,8 @@
     "prepare": "husky",
     "buildAndCommit": "pnpm build && git add -A dist/",
     "prepublishOnly": "pnpm build",
-    "release:main": "pnpm build && pnpm publish --access public",
-    "release:beta": "pnpm build && pnpm publish --access public --tag beta"
+    "release:main": "pnpm publish --access public",
+    "release:beta": "pnpm publish --access public --tag beta"
   },
   "devDependencies": {
     "@biomejs/biome": "2.2.2",

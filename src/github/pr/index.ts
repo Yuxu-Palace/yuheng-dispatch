@@ -1,7 +1,7 @@
 import { context, getOctokit } from '@actions/github';
-import { COMMENT_CONFIG, COMMENT_TEMPLATES, PAGINATION_CONFIG } from '../../utils/constants';
-import type { IssueComment, PRData, SupportedBranch, VersionPreviewData } from '../../utils/types';
-import { getInput, logger } from '../actions';
+import { getInput, logger } from '@/github/actions';
+import { COMMENT_CONFIG, COMMENT_TEMPLATES, PAGINATION_CONFIG } from '@/utils/constants';
+import type { IssueComment, PRData, SupportedBranch, VersionPreviewData } from '@/utils/types';
 
 // ==================== GitHub API 客户端 ====================
 

@@ -1,7 +1,7 @@
 import { readPackageJSON, resolvePackageJSON, writePackageJSON } from 'pkg-types';
 import semver, { type ReleaseType } from 'semver';
-import { logger } from '../../github/actions';
-import { createErrorComment, getCurrentPRNumber } from '../../github/pr';
+import { logger } from '@/github/actions';
+import { createErrorComment, getCurrentPRNumber } from '@/github/pr';
 import {
   ActionError,
   addVersionPrefix,
@@ -10,9 +10,9 @@ import {
   getVersionPrefix,
   hasVersionPrefix,
   normalizeVersion,
-} from '../../utils';
-import { DEFAULT_VERSIONS } from '../../utils/constants';
-import type { PRData, SupportedBranch, VersionSummary } from '../../utils/types';
+} from '@/utils';
+import { DEFAULT_VERSIONS } from '@/utils/constants';
+import type { PRData, SupportedBranch, VersionSummary } from '@/utils/types';
 
 // ==================== 版本管理辅助函数 ====================
 

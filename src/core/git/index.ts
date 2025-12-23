@@ -1,10 +1,10 @@
 import { context } from '@actions/github';
-import { logger } from '../../github/actions';
-import { ActionError, execGit, versionParse } from '../../utils';
-import { COMMIT_TEMPLATES, GIT_USER_CONFIG, RETRY_CONFIG, VERSION_PREFIX_CONFIG } from '../../utils/constants';
-import type { BranchSyncResult, PRData, SupportedBranch } from '../../utils/types';
-import { commitChangelog, hasChangelogChanges, updateChangelog } from '../changelog';
-import { updatePackageVersion } from '../version';
+import { commitChangelog, hasChangelogChanges, updateChangelog } from '@/core/changelog';
+import { updatePackageVersion } from '@/core/version';
+import { logger } from '@/github/actions';
+import { ActionError, execGit, versionParse } from '@/utils';
+import { COMMIT_TEMPLATES, GIT_USER_CONFIG, RETRY_CONFIG, VERSION_PREFIX_CONFIG } from '@/utils/constants';
+import type { BranchSyncResult, PRData, SupportedBranch } from '@/utils/types';
 
 // ==================== Git 基础操作 ====================
 
@@ -22,11 +22,11 @@ export async function configureGitUser(): Promise<void> {
  */
 export async function commitAndPushVersion(version: string, targetBranch: SupportedBranch): Promise<void> {
   try {
-    const { pkgVersion: packageVersion, targetVersion: fullVersion } = versionParse(version);
+    const { targetVersion: fullVersion } = versionParse(version);
 
     // 提交版本更改
     await execGit(['add', '.']);
-    await execGit(['commit', '-m', COMMIT_TEMPLATES.VERSION_BUMP(packageVersion, targetBranch)]);
+    await execGit(['commit', '-m', COMMIT_TEMPLATES.VERSION_BUMP(fullVersion, targetBranch)]);
 
     // 创建版本标签
     await execGit(['tag', fullVersion]);
@@ -105,10 +105,10 @@ function isAutoSyncCommit(): boolean {
  * 获取同步提交消息
  */
 function getCommitMessage(sourceBranch: SupportedBranch, targetBranch: SupportedBranch, version: string): string {
-  const cleanVersion = versionParse(version).pkgVersion;
+  const { pkgVersion: cleanVersion, targetVersion: fullVersion } = versionParse(version);
   const prefix = VERSION_PREFIX_CONFIG.CURRENT;
   if (sourceBranch === 'main' && targetBranch === 'beta') {
-    return COMMIT_TEMPLATES.SYNC_MAIN_TO_BETA(cleanVersion);
+    return COMMIT_TEMPLATES.SYNC_MAIN_TO_BETA(fullVersion);
   }
   return `chore: sync ${sourceBranch} ${prefix}${cleanVersion} to ${targetBranch} [skip ci]`;
 }
