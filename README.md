@@ -318,12 +318,69 @@ pnpm install
 pnpm build
 ```
 
-### 手动发布 (pnpm publish)
+### 在您的项目中配置 npm 发布（可选）
 
-1. 确认版本号已更新（可由 Action 生成或手动修改 `package.json`）。
-2. 配置 npm 发布凭据（例如在 `.npmrc` 中设置 `//registry.npmjs.org/:_authToken=${NPM_TOKEN}`）。
-3. 运行 `pnpm run release`（内部会先构建再执行 `pnpm publish --access public`）；如需自定义命令，可直接执行 `pnpm publish`，`prepublishOnly` 会确保构建完成。
-4. 发布完成后为对应 tag 创建 GitHub Release（可选），方便消费者使用。
+如果您的项目需要发布到 npm，可以配置以下脚本到您项目的 `package.json`：
+
+```json
+{
+  "scripts": {
+    "prepublishOnly": "pnpm build",
+    "release:main": "pnpm publish --access public",
+    "release:beta": "pnpm publish --access public --tag beta"
+  }
+}
+```
+
+**发布流程：**
+
+1. **确保版本已更新**：本 Action 会自动更新 `package.json` 版本号
+2. **配置 npm 凭据**：在项目 `.npmrc` 中设置 `//registry.npmjs.org/:_authToken=${NPM_TOKEN}`
+3. **手动发布**：
+   - Beta 版本：`pnpm run release:beta`（发布为 `@beta` tag）
+   - 正式版本：`pnpm run release:main`（发布为 `latest` tag）
+4. **或使用 CI/CD**：在 GitHub Actions workflow 中自动发布
+
+**CI/CD 自动发布示例：**
+
+```yaml
+name: Publish to npm
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Publish to npm
+        run: |
+          if [[ ${{ github.ref }} == *"beta"* ]]; then
+            pnpm run release:beta
+          else
+            pnpm run release:main
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+```
+
+> 💡 **提示**：本 Action 会自动管理版本号和 CHANGELOG，您只需要在版本更新后执行发布即可。
 
 ### 代码格式化
 
