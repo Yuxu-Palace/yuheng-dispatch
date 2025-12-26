@@ -1,9 +1,9 @@
 import * as fs from 'node:fs';
 import { exec } from '@actions/exec';
-import { COMMIT_TEMPLATES, LABEL_TO_CHANGELOG_TYPE, PR_SECTION_PATTERNS } from './constants';
-import { getBooleanInput, logger } from './core';
-import type { PRData } from './types';
-import { addVersionPrefix, commitAndPushFile, hasFileChanges } from './utils';
+import { getBooleanInput, logger } from '@/github/actions';
+import { addVersionPrefix, commitAndPushFile, hasFileChanges } from '@/utils';
+import { CHANGELOG_CONFIG, COMMIT_TEMPLATES, LABEL_TO_CHANGELOG_TYPE, PR_SECTION_PATTERNS } from '@/utils/constants';
+import type { PRData, SupportedBranch } from '@/utils/types';
 
 // ==================== CHANGELOG 操作 ====================
 
@@ -38,7 +38,7 @@ function processSectionContent(content: string): string {
   const lines: string[] = content.trim().split('\n');
   const resultLines: string[] = [];
 
-  for (let i = 0; i < lines.length && resultLines.length < 5; i++) {
+  for (let i = 0; i < lines.length && resultLines.length < CHANGELOG_CONFIG.MAX_LINES_PER_SECTION; i++) {
     const line = lines[i].trim();
     if (!line) {
       continue;
@@ -122,7 +122,7 @@ export async function updateChangelog(pr: PRData | null = null, version = ''): P
     logger.info('开始生成基于 PR 的 CHANGELOG...');
 
     const currentDate = new Date().toISOString().split('T')[0];
-    const versionTag = version.startsWith('v') ? version : `v${version}`;
+    const versionTag = addVersionPrefix(version);
 
     // 生成基于 PR 的 CHANGELOG 条目
     const changelogEntry = await generateChangelogFromPR(pr, version);
@@ -188,7 +188,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
     // 显示新增的内容预览（限制大小，避免日志过多）
     try {
-      const previewLines = newContent.split('\n').slice(0, 15);
+      const previewLines = newContent.split('\n').slice(0, CHANGELOG_CONFIG.PREVIEW_LINES);
       const preview = previewLines.join('\n');
       logger.info('📋 CHANGELOG 预览:');
       logger.info(preview);
@@ -271,8 +271,8 @@ export async function hasChangelogChanges(): Promise<boolean> {
 /**
  * 提交 CHANGELOG 文件更改
  */
-export async function commitChangelog(version: string, targetBranch: string): Promise<void> {
+export async function commitChangelog(version: string, targetBranch: SupportedBranch): Promise<void> {
   const fullVersion = addVersionPrefix(version);
-  await commitAndPushFile('CHANGELOG.md', COMMIT_TEMPLATES.CHANGELOG_UPDATE(fullVersion), targetBranch as any);
+  await commitAndPushFile('CHANGELOG.md', COMMIT_TEMPLATES.CHANGELOG_UPDATE(fullVersion), targetBranch);
   logger.info('✅ CHANGELOG 更新已提交');
 }

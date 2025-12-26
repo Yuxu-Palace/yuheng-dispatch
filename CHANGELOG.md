@@ -1,7 +1,22 @@
+## [v0.2.0-beta.0] - 2025-12-26
+
+### ✨ Features
+- fix: 删除 npm 自动发布 & 开发链路减少 alpha ([#26](https://github.com/Yuxu-Palace/yuheng-dispatch/pull/26))
+
+
+
 ## [v0.1.2] - 2025-12-09
 
 ### 📝 Changes
 - Beta ([#25](https://github.com/Yuxu-Palace/yuheng-dispatch/pull/25))
+
+
+
+## [v0.1.2-beta.0] - 2025-12-09
+
+### 📝 Changes
+- Alpha ([#24](https://github.com/Yuxu-Palace/yuheng-dispatch/pull/24))
+
 
 
 ## [v0.1.2-alpha.0] - 2025-12-09

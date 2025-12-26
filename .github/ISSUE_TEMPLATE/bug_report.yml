@@ -1,0 +1,105 @@
+name: 🐛 Bug Report
+description: 报告项目中的 Bug
+title: "[Bug]: "
+labels: ["bug"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢您报告 Bug！请填写以下信息以帮助我们更快地定位和修复问题。
+
+  - type: input
+    id: version
+    attributes:
+      label: Action 版本
+      description: 您使用的 yuheng-dispatch Action 版本
+      placeholder: "例如: v0.1.2-beta.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: 问题描述
+      description: 清晰简洁地描述遇到的问题
+      placeholder: 描述发生了什么问题...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 复现步骤
+      description: 如何复现这个问题
+      placeholder: |
+        1. 创建 PR 到 beta 分支...
+        2. 添加 'minor' 标签...
+        3. 查看 Action 运行结果...
+        4. 出现错误...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望行为
+      description: 您期望发生什么
+      placeholder: 应该自动更新版本为 v1.1.0-beta.0...
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际行为
+      description: 实际发生了什么
+      placeholder: 但实际版本更新为 v1.0.1-beta.0...
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 相关日志
+      description: 粘贴 GitHub Actions 运行日志（如果有）
+      render: shell
+      placeholder: |
+        复制 GitHub Actions 的运行日志...
+
+  - type: input
+    id: pr-link
+    attributes:
+      label: PR 链接
+      description: 出现问题的 PR 链接（如果适用）
+      placeholder: "https://github.com/your-org/your-repo/pull/123"
+
+  - type: dropdown
+    id: branch
+    attributes:
+      label: 目标分支
+      description: PR 的目标分支
+      options:
+        - main
+        - beta
+        - 其他
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: 补充信息
+      description: 其他有助于解决问题的信息
+      placeholder: |
+        - 仓库是否为私有仓库
+        - 是否修改了默认配置
+        - 其他特殊情况...
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: 检查清单
+      description: 请确认您已完成以下检查
+      options:
+        - label: 我已搜索现有 Issues，确认这不是重复问题
+          required: true
+        - label: 我已阅读文档和故障排除指南
+          required: true
+        - label: 我使用的是最新版本的 Action
+          required: false

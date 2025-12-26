@@ -1,0 +1,54 @@
+name: ❓ Question
+description: 咨询使用问题
+title: "[Question]: "
+labels: ["question"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        有问题？欢迎提问！请先查看[文档](https://github.com/Yuxu-Palace/yuheng-dispatch#readme)和[常见问题](https://github.com/Yuxu-Palace/yuheng-dispatch#%E6%95%85%E9%9A%9C%E6%8E%92%E9%99%A4)。
+
+  - type: textarea
+    id: question
+    attributes:
+      label: 问题描述
+      description: 详细描述您的问题
+      placeholder: 我想了解...
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: 环境信息
+      description: 提供相关的环境和配置信息
+      placeholder: |
+        - Action 版本:
+        - 目标分支:
+        - 配置参数:
+        - 其他相关信息:
+
+  - type: textarea
+    id: tried
+    attributes:
+      label: 已尝试的方法
+      description: 您已经尝试过哪些方法？
+      placeholder: |
+        我已经尝试过...
+        查看了...
+        但仍然不理解...
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: 检查清单
+      description: 请确认您已完成以下检查
+      options:
+        - label: 我已阅读 README 文档
+          required: true
+        - label: 我已搜索现有 Issues
+          required: true
+        - label: 我已查看故障排除部分
+          required: false

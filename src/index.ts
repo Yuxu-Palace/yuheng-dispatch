@@ -1,11 +1,11 @@
 import process from 'node:process';
 import { context } from '@actions/github';
-import { logger, setFailed, setOutput } from './core';
-import { configureGitUser, syncBranches, updateVersionAndCreateTag } from './git';
-import { createErrorComment, getCurrentPRNumber, handlePreviewMode } from './pr';
-import type { PRData, PRWorkflowInfo, SupportedBranch } from './types';
-import { ActionError, isSupportedBranch } from './utils';
-import { calculateNewVersion, getBaseVersion } from './version';
+import { configureGitUser, syncBranches, updateVersionAndCreateTag } from '@/core/git';
+import { calculateNewVersion, getBaseVersion } from '@/core/version';
+import { logger, setFailed, setOutput } from '@/github/actions';
+import { createErrorComment, getCurrentPRNumber, handlePreviewMode } from '@/github/pr';
+import { ActionError, isSupportedBranch } from '@/utils';
+import type { PRData, PRWorkflowInfo, SupportedBranch } from '@/utils/types';
 
 // ==================== 主执行函数 ====================
 
@@ -30,7 +30,7 @@ async function handleExecutionMode(
 /**
  * 验证事件类型并提取 PR 信息
  */
-function validateAndExtractPRInfo(): PRWorkflowInfo {
+function validateAndExtractPRInfo(): PRWorkflowInfo | null {
   if (context.eventName !== 'pull_request' && context.eventName !== 'pull_request_target') {
     throw new ActionError(`只支持 pull_request 事件，当前事件: ${context.eventName}`, 'validateEvent');
   }
@@ -44,9 +44,10 @@ function validateAndExtractPRInfo(): PRWorkflowInfo {
   const sourceBranch = prPayload.head.ref;
   const prNumber = prPayload.number;
 
-  // 类型守卫：确保 targetBranch 是支持的分支类型
+  // 类型守卫：确保 targetBranch 是支持的分支类型；不支持时直接跳过而非抛错
   if (!isSupportedBranch(targetBranch)) {
-    throw new ActionError(`不支持的分支: ${targetBranch}，跳过版本管理`, 'validateBranch');
+    logger.info(`不支持的分支: ${targetBranch}，跳过版本管理`);
+    return null;
   }
 
   const pr = prPayload as PRData;
@@ -118,6 +119,45 @@ async function processVersionCalculation(
 }
 
 /**
+ * 预览模式流程
+ */
+async function runPreviewWorkflow(
+  info: PRWorkflowInfo,
+  baseVersion: string | null,
+  newVersion: string | null,
+): Promise<void> {
+  logger.info('📝 执行预览模式...');
+  await handlePreviewMode(info.pr, info.sourceBranch, info.targetBranch, baseVersion, newVersion);
+  setOutput('preview-version', newVersion || '');
+  setOutput('is-preview', 'true');
+}
+
+/**
+ * 执行模式流程
+ */
+async function runExecutionWorkflow(
+  info: PRWorkflowInfo,
+  baseVersion: string | null,
+  newVersion: string | null,
+): Promise<void> {
+  logger.info('🚀 执行版本更新模式...');
+
+  if (!newVersion) {
+    logger.info(
+      `ℹ️ 无需版本升级 - 合并方向: ${info.sourceBranch} → ${info.targetBranch}, 当前版本: ${baseVersion || '无'}`,
+    );
+    setOutput('next-version', '');
+    setOutput('is-preview', 'false');
+    return;
+  }
+
+  await handleExecutionMode(newVersion, info.targetBranch, info.pr);
+  setOutput('next-version', newVersion);
+  setOutput('is-preview', 'false');
+  logger.info(`✅ 版本更新完成: ${newVersion}`);
+}
+
+/**
  * 执行工作流程
  */
 async function executeWorkflow(
@@ -126,30 +166,10 @@ async function executeWorkflow(
   newVersion: string | null,
 ): Promise<void> {
   if (info.isDryRun) {
-    // 预览模式：更新 PR 评论
-    logger.info('📝 执行预览模式...');
-    await handlePreviewMode(info.pr, info.sourceBranch, info.targetBranch, baseVersion, newVersion);
-    setOutput('preview-version', newVersion || '');
-    setOutput('is-preview', 'true');
-  } else {
-    // 执行模式：无论是否有新版本都要处理
-    logger.info('🚀 执行版本更新模式...');
-
-    if (newVersion) {
-      // 有新版本：更新版本并同步分支 - 传递 PR 信息给 CHANGELOG 生成
-      await handleExecutionMode(newVersion, info.targetBranch, info.pr);
-      setOutput('next-version', newVersion);
-      logger.info(`✅ 版本更新完成: ${newVersion}`);
-    } else {
-      // 无新版本：记录详细信息但不阻塞流程
-      logger.info(
-        `ℹ️ 无需版本升级 - 合并方向: ${info.sourceBranch} → ${info.targetBranch}, 当前版本: ${baseVersion || '无'}`,
-      );
-      setOutput('next-version', '');
-    }
-
-    setOutput('is-preview', 'false');
+    await runPreviewWorkflow(info, baseVersion, newVersion);
+    return;
   }
+  await runExecutionWorkflow(info, baseVersion, newVersion);
 }
 
 /**
@@ -189,6 +209,13 @@ async function run(): Promise<void> {
   try {
     // 1. 验证事件并提取 PR 信息
     const workflowInfo = validateAndExtractPRInfo();
+    if (!workflowInfo) {
+      // 不支持的分支：直接跳过，设置空输出以保持一致
+      setOutput('preview-version', '');
+      setOutput('next-version', '');
+      setOutput('is-preview', 'true');
+      return;
+    }
 
     // 2. 打印调试信息
     printDebugInfo(workflowInfo);

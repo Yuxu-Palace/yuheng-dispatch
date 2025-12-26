@@ -6,3 +6,7 @@
 # Dist
 node_modules
 storybook-static
+
+# Test coverage (if added in future)
+coverage/
+*.lcov
