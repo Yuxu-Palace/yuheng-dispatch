@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📖 文档
+    url: https://github.com/Yuxu-Palace/yuheng-dispatch#readme
+    about: 查看项目文档和使用指南
+  - name: 💬 讨论区
+    url: https://github.com/Yuxu-Palace/yuheng-dispatch/discussions
+    about: 在 Discussions 中提问和讨论
+  - name: 🏗️ 架构文档
+    url: https://github.com/Yuxu-Palace/yuheng-dispatch/blob/main/docs/data-flow.md
+    about: 查看详细的架构和数据流程文档
