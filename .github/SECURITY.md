@@ -163,7 +163,7 @@
 
 ## 联系方式
 
-- **安全问题**: 使用 GitHub Security Advisories 或邮件 security@yuxu-palace.com
+- **安全问题**: 使用 GitHub Security Advisories 或邮件 snailuu@foxmail.com
 - **一般问题**: [GitHub Issues](https://github.com/Yuxu-Palace/yuheng-dispatch/issues)
 - **讨论**: [GitHub Discussions](https://github.com/Yuxu-Palace/yuheng-dispatch/discussions)
 
