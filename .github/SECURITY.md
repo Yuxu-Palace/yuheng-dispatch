@@ -31,7 +31,7 @@
 
 #### 方法 2: 私密邮件
 
-发送邮件至：**security@yuxu-palace.com**
+发送邮件至：**snailuu@foxmail.com**
 
 （如果该邮箱不存在，请通过创建 Private Security Advisory 报告）
 
