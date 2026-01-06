@@ -1,7 +1,33 @@
+## [v0.2.0-beta.1] - 2026-01-06
+
+### 🐛 Bug Fixes
+- fix: 修复 beta 分支工作流信息 & 修改 security 联系邮箱 & 移除 main.json 中的 alpha 分支保护 ([#29](https://github.com/Yuxu-Palace/yuheng-dispatch/pull/29))
+  - by CodeRabbit
+  - * **文档**
+  - * 扩展版本管理文档，新增紧急修复（Hotfix）工作流程与示例
+  - * 更新主分支合并规则、分支命名约定、标签与版本计算说明
+  - * 补充故障排除、集成与 CI/CD 配置示例
+
+
+## [v0.2.0-beta.0] - 2025-12-26
+
+### ✨ Features
+- fix: 删除 npm 自动发布 & 开发链路减少 alpha ([#26](https://github.com/Yuxu-Palace/yuheng-dispatch/pull/26))
+
+
+
 ## [v0.1.2] - 2025-12-09
 
 ### 📝 Changes
 - Beta ([#25](https://github.com/Yuxu-Palace/yuheng-dispatch/pull/25))
+
+
+
+## [v0.1.2-beta.0] - 2025-12-09
+
+### 📝 Changes
+- Alpha ([#24](https://github.com/Yuxu-Palace/yuheng-dispatch/pull/24))
+
 
 
 ## [v0.1.2-alpha.0] - 2025-12-09

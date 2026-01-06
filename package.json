@@ -1,13 +1,12 @@
 {
   "name": "@yuxu-palace/yuheng-dispatch",
-  "version": "0.1.2",
+  "version": "0.2.0-beta.1",
   "type": "module",
   "description": "A GitHub Action for automatic package version patching with semantic versioning workflow",
   "keywords": [
     "github-action",
     "semantic-versioning",
     "version-management",
-    "npm-publishing",
     "changelog-generation"
   ],
   "author": "Yuxu-Palace",
@@ -20,14 +19,12 @@
   "bugs": {
     "url": "https://github.com/Yuxu-Palace/yuheng-dispatch/issues"
   },
-  "main": "./dist/index.cjs",
   "scripts": {
     "build": "tsup",
     "check": "biome check --write",
     "format": "biome format --write",
     "prepare": "husky",
-    "buildAndCommit": "pnpm build && git add -A dist/",
-    "prepublishOnly": "echo \"Error, Do not publish as npm package\" | exit 1"
+    "buildAndCommit": "pnpm build && git add -A dist/"
   },
   "devDependencies": {
     "@biomejs/biome": "2.2.2",
