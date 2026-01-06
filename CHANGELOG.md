@@ -1,3 +1,14 @@
+## [v0.2.0] - 2026-01-06
+
+### 📝 Changes
+- Beta ([#27](https://github.com/Yuxu-Palace/yuheng-dispatch/pull/27))
+  - by CodeRabbit
+  - * **New Features**
+  - * 新增问题/功能/疑问/GitHub PR 模板与项目安全政策，便于统一提报与审查流程。
+  - * **Documentation**
+  - * 重写 README，聚焦 Beta/Main 流程；新增 CONTRIBUTING.md；新增 CHANGELOG 条目并移除旧文档（CLAUDE.md）。
+
+
 ## [v0.2.0-beta.1] - 2026-01-06
 
 ### 🐛 Bug Fixes
