@@ -35,8 +35,13 @@ PR 标签: major → 目标: v2.0.0 > v1.1.0 → 结果: v2.0.0-beta.0
 ```
 
 ### Main 分支 (`main`)
-- **源分支限制**：只接受来自 Beta 分支的合并
-- **版本转换**：去除预发布标识，发布正式版本（`x.y.z-beta.n` → `x.y.z`）
+- **源分支限制**：接受来自 Beta 分支（正常发布）或 Hotfix 分支（紧急修复）
+- **版本规则**：
+  - **来自 Beta**：去除预发布标识，发布正式版本（`x.y.z-beta.n` → `x.y.z`）
+  - **来自 Hotfix**：
+    - 分支命名必须以 `hotfix/` 开头（如 `hotfix/critical-bug`）
+    - 必需标签：`hotfix` + 版本标签（`major`/`minor`/`patch`）
+    - 版本计算：当前版本 + 标签类型（如 `v1.2.0` + `patch` → `v1.2.1`）
 
 ### 分支同步策略
 - **Main → Beta**：使用 `rebase` 同步
@@ -84,9 +89,13 @@ jobs:
 
 在您的仓库中创建以下标签：
 
+**版本标签**（必需）：
 - `major`：主版本更新（破坏性变更）
 - `minor`：次版本更新（新增功能）
 - `patch`：补丁版本更新（bug 修复）
+
+**特殊标签**（可选）：
+- `hotfix`：紧急修复标识（用于 hotfix 分支合并到 main，必须与版本标签组合使用）
 
 ## 📖 使用示例
 
@@ -113,6 +122,23 @@ git checkout -b feature/new-api beta
 # Beta 测试完成，创建 PR：beta → main
 # Action 将自动：
 # - 发布正式版本：v1.2.0
+# - 同步代码到 beta 分支
+```
+
+### Hotfix 紧急修复流程
+
+```bash
+# 1. 从 main 创建 hotfix 分支（必须以 hotfix/ 开头）
+git checkout -b hotfix/critical-security-fix main
+# ... 修复 bug
+
+# 2. 创建 PR 到 main 分支，添加两个必需标签：
+# - hotfix（标识紧急修复）
+# - patch（版本升级类型，通常 bug 修复用 patch）
+
+# Action 将自动：
+# - 升级版本：v1.2.0 → v1.2.1
+# - 更新 CHANGELOG
 # - 同步代码到 beta 分支
 ```
 
@@ -276,15 +302,19 @@ graph TD
 
 ### 开发流程建议
 
-1. **功能开发**：在 beta 分支进行新功能开发
-2. **生产发布**：测试完成后合并到 main 发布生产版本
-3. **热修复**：在对应环境分支创建修复分支
+1. **功能开发**：从 beta 分支创建功能分支，开发完成后合并回 beta
+2. **生产发布**：beta 测试完成后合并到 main 发布生产版本
+3. **紧急修复**：从 main 创建 `hotfix/*` 分支，修复后直接合并到 main
 
 ### 标签使用建议
 
+**版本标签**（用于版本升级）：
 - `major`：API 破坏性变更、架构重构
 - `minor`：新增功能、新增 API
 - `patch`：bug 修复、性能优化、文档更新
+
+**特殊标签**：
+- `hotfix`：紧急修复标识（仅用于 hotfix 分支合并到 main，必须与版本标签一起使用）
 
 ## 📝 故障排除
 

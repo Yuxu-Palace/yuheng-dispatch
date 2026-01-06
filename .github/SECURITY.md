@@ -31,7 +31,7 @@
 
 #### 方法 2: 私密邮件
 
-发送邮件至：**security@yuxu-palace.com**
+发送邮件至：**snailuu@foxmail.com**
 
 （如果该邮箱不存在，请通过创建 Private Security Advisory 报告）
 
@@ -163,7 +163,7 @@
 
 ## 联系方式
 
-- **安全问题**: 使用 GitHub Security Advisories 或邮件 security@yuxu-palace.com
+- **安全问题**: 使用 GitHub Security Advisories 或邮件 snailuu@foxmail.com
 - **一般问题**: [GitHub Issues](https://github.com/Yuxu-Palace/yuheng-dispatch/issues)
 - **讨论**: [GitHub Discussions](https://github.com/Yuxu-Palace/yuheng-dispatch/discussions)
 

@@ -54,7 +54,7 @@ jobs:
     runs-on: ubuntu-latest
     # 🎯 简化条件：预览模式（有标签） + 执行模式（PR合并）
     if: |
-      !contains(github.event.head_commit.message, '[skip ci]') &&
+      !contains(github.event.pull_request.title, '[skip ci]') &&
       github.event_name == 'pull_request' && (
         (github.event.action != 'closed' && github.event.pull_request.labels.*) ||
         (github.event.action == 'closed' && github.event.pull_request.merged == true)
