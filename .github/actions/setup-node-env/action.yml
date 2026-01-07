@@ -1,0 +1,35 @@
+name: 'Setup Node Environment'
+description: '设置 Node.js、pnpm 和依赖，支持可选的依赖安装'
+
+inputs:
+  node-version:
+    description: 'Node.js 版本'
+    required: false
+    default: '20'
+  pnpm-version:
+    description: 'pnpm 版本'
+    required: false
+    default: '10'
+  install-dependencies:
+    description: '是否安装 node_modules 依赖'
+    required: false
+    default: 'true'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: ${{ inputs.pnpm-version }}
+
+    - name: Install Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: pnpm
+
+    - name: Install dependencies
+      if: inputs.install-dependencies == 'true'
+      shell: bash
+      run: pnpm install
