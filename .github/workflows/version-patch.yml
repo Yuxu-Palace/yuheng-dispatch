@@ -20,19 +20,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install
+      - name: Setup Node environment
+        uses: ./.github/actions/setup-node-env
 
       - name: Run Biome check
         run: pnpm check
@@ -71,15 +60,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
+      - name: Setup Node environment
+        uses: ./.github/actions/setup-node-env
         with:
-          version: 10
-
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
+          install-dependencies: 'false'
 
       - name: Download publish artifact
         uses: actions/download-artifact@v4
@@ -99,3 +83,39 @@ jobs:
           git-user-email: 'cmtlyt@163.com'  # Git 提交时的邮箱
           enable-changelog: 'true'  # 自动生成和更新 CHANGELOG.md
           comment-title: '📦 版本管理'  # PR 评论中显示的标题
+
+  # 构建并提交 dist 目录
+  build-dist:
+    name: Build and commit dist
+    runs-on: ubuntu-latest
+    needs: version-patch
+    # 只在 PR 合并时执行
+    if: github.event.pull_request.merged == true
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # 切换到目标分支（合并后的分支）
+          ref: ${{ github.event.pull_request.base.ref }}
+          fetch-depth: 0
+
+      - name: Setup Node environment
+        uses: ./.github/actions/setup-node-env
+
+      - name: Build dist
+        run: pnpm run build
+
+      - name: Commit and push dist
+        run: |
+          if git status --porcelain dist | grep -q .; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add dist
+            git commit -m "chore: build dist [skip ci]"
+            git push
+          else
+            echo "No dist changes to commit."
+          fi
