@@ -4,6 +4,23 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import process from 'node:process';
+import type { PRData } from '../src/utils/types';
+
+type TestPRData = Pick<PRData, 'body' | 'html_url' | 'number' | 'title'> & {
+  head: Pick<PRData['head'], 'ref'>;
+  labels: Pick<PRData['labels'][number], 'name'>[];
+};
+
+function restoreEnv(snapshot: Record<string, string | undefined>): void {
+  for (const [key, value] of Object.entries(snapshot)) {
+    if (value === undefined) {
+      Reflect.deleteProperty(process.env, key);
+      continue;
+    }
+
+    process.env[key] = value;
+  }
+}
 
 function runGit(cwd: string, args: string[]): string {
   return execFileSync('git', args, {
@@ -84,14 +101,16 @@ void test('版本标签应指向包含 CHANGELOG 的发布提交', async () => {
 
     const { updateVersionAndCreateTag } = await import('../src/core/git/index');
 
-    await updateVersionAndCreateTag('v0.1.0-beta.4', 'beta', {
+    const prData = {
       body: '## 变更\n- 修复发布顺序',
       head: { ref: 'feature/release-order' },
       html_url: 'https://example.com/pull/1',
       labels: [{ name: 'patch' }],
       number: 1,
       title: 'fix: 修复发布顺序',
-    } as never);
+    } satisfies TestPRData;
+
+    await updateVersionAndCreateTag('v0.1.0-beta.4', 'beta', prData as unknown as PRData);
 
     const headCommit = runGit(workDir, ['rev-parse', 'HEAD']);
     const tagCommit = runGit(workDir, ['rev-list', '-n', '1', 'v0.1.0-beta.4']);
@@ -104,11 +123,7 @@ void test('版本标签应指向包含 CHANGELOG 的发布提交', async () => {
   } finally {
     process.chdir(originalCwd);
 
-    process.env['INPUT_ENABLE-CHANGELOG'] = originalEnv['INPUT_ENABLE-CHANGELOG'];
-    process.env['INPUT_VERSION-PREFIX'] = originalEnv['INPUT_VERSION-PREFIX'];
-    process.env['INPUT_GIT-USER-NAME'] = originalEnv['INPUT_GIT-USER-NAME'];
-    process.env['INPUT_GIT-USER-EMAIL'] = originalEnv['INPUT_GIT-USER-EMAIL'];
-    process.env.INPUT_TOKEN = originalEnv.INPUT_TOKEN;
+    restoreEnv(originalEnv);
 
     rmSync(rootDir, { force: true, recursive: true });
   }
