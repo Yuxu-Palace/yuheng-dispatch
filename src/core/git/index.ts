@@ -1,5 +1,5 @@
 import { context } from '@actions/github';
-import { commitChangelog, hasChangelogChanges, updateChangelog } from '@/core/changelog';
+import { hasChangelogChanges, updateChangelog } from '@/core/changelog';
 import { updatePackageVersion } from '@/core/version';
 import { logger } from '@/github/actions';
 import { ActionError, execGit, versionParse } from '@/utils';
@@ -207,16 +207,14 @@ export async function updateVersionAndCreateTag(
     // 更新版本文件
     await updatePackageVersion(newVersion);
 
-    // 提交版本更改并推送（创建 tag）
-    await commitAndPushVersion(newVersion, targetBranch);
-
     // 更新 CHANGELOG - 使用 PR 信息
     await updateChangelog(pr, newVersion);
 
     // 检查是否有 CHANGELOG 更改需要提交 - 每次版本发布都必须有 CHANGELOG 变更
     const hasChanges = await hasChangelogChanges();
     if (hasChanges) {
-      await commitChangelog(newVersion, targetBranch);
+      // 将版本文件与 CHANGELOG 合并到同一发布提交，再创建 tag
+      await commitAndPushVersion(newVersion, targetBranch);
     } else {
       const errorMessage = 'CHANGELOG 未生成任何内容，这不应该发生。请检查 PR 描述或提交历史是否包含足够的变更信息。';
       logger.error(errorMessage);
