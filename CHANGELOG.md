@@ -1,3 +1,10 @@
+## [v0.2.1-beta.1] - 2026-03-17
+
+### 🐛 Bug Fixes
+- fix(release): 修复版本标签与 CHANGELOG 提交顺序 ([#33](https://github.com/Yuxu-Palace/yuheng-dispatch/pull/33))
+  - by CodeRabbit
+
+
 ## [v0.2.1-beta.0] - 2026-03-02
 
 ### 🐛 Bug Fixes
