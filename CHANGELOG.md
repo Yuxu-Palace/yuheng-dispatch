@@ -1,3 +1,10 @@
+## [v0.2.1] - 2026-03-20
+
+### ✨ Features
+- Beta ([#34](https://github.com/Yuxu-Palace/yuheng-dispatch/pull/34))
+  - by CodeRabbit
+
+
 ## [v0.2.1-beta.1] - 2026-03-17
 
 ### 🐛 Bug Fixes
