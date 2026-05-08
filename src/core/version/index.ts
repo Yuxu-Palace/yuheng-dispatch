@@ -292,8 +292,8 @@ async function validateBranchVersionState(targetBranch: SupportedBranch, pr: PRD
       errorMsg: 'Beta 分支只能在正式版本或 Beta 版本后继续开发',
     },
     main: {
-      allowedTypes: ['beta'],
-      errorMsg: 'Main 分支只能在 Beta 测试完成后发布',
+      allowedTypes: ['beta', 'release'],
+      errorMsg: 'Main 分支只能在 Beta 测试完成后或 Hotfix 紧急修复时发布',
     },
   };
 
